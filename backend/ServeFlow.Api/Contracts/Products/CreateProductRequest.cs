@@ -12,5 +12,7 @@ public record CreateProductRequest(
     decimal Price,
 
     [StringLength(1000)]
-    string? Description
+    string? Description,
+
+    Guid? CategoryId = null
 );

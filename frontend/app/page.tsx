@@ -8,6 +8,14 @@ import {
   useState,
 } from "react";
 
+type Category = {
+  id: string;
+  name: string;
+  description?: string | null;
+  createdAtUtc?: string;
+  productCount?: number;
+};
+
 type Product = {
   id: string;
   name: string;
@@ -15,6 +23,8 @@ type Product = {
   price: number;
   isAvailable: boolean;
   createdAtUtc?: string;
+  categoryId?: string | null;
+  category?: Category | null;
 };
 
 type ProductForm = {
@@ -22,6 +32,12 @@ type ProductForm = {
   price: string;
   description: string;
   isAvailable: boolean;
+  categoryId: string;
+};
+
+type CategoryForm = {
+  name: string;
+  description: string;
 };
 
 type ProductsResponse = {
@@ -43,6 +59,12 @@ const emptyForm: ProductForm = {
   price: "",
   description: "",
   isAvailable: true,
+  categoryId: "",
+};
+
+const emptyCategoryForm: CategoryForm = {
+  name: "",
+  description: "",
 };
 
 function formatPrice(price: number) {
@@ -52,6 +74,17 @@ function formatPrice(price: number) {
   })}`;
 }
 
+async function readError(
+  response: Response,
+  fallback: string
+): Promise<string> {
+  try {
+    const body = await response.json();
+    return body.message ?? body.title ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 async function fetchProducts(
   page: number,
@@ -87,40 +120,67 @@ async function fetchProducts(
     !Array.isArray(data.items)
   ) {
     throw new Error(
-      "Unexpected API response. Make sure the backend returns a paginated products object with an items array."
+      "Unexpected API response. Expected a paginated products response."
     );
   }
 
   const payload = data as Record<string, unknown>;
+  const items = payload.items as Product[];
 
   return {
-    items: payload.items as Product[],
+    items,
     page:
       typeof payload.page === "number" ? payload.page : page,
     pageSize:
-      typeof payload.pageSize === "number" ? payload.pageSize : pageSize,
+      typeof payload.pageSize === "number"
+        ? payload.pageSize
+        : pageSize,
     totalCount:
       typeof payload.totalCount === "number"
         ? payload.totalCount
-        : (payload.items as unknown[]).length,
+        : items.length,
     totalPages:
       typeof payload.totalPages === "number"
         ? payload.totalPages
-        : Math.ceil((payload.items as unknown[]).length / pageSize),
+        : Math.ceil(items.length / pageSize),
   };
 }
 
+async function fetchCategories(): Promise<Category[]> {
+  const response = await fetch(`${API_URL}/api/categories`, {
+    cache: "no-store",
+  });
 
+  if (!response.ok) {
+    throw new Error(
+      `Could not load categories. API returned ${response.status}.`
+    );
+  }
 
+  const data: unknown = await response.json();
+
+  if (!Array.isArray(data)) {
+    throw new Error("Unexpected categories API response.");
+  }
+
+  return data as Category[];
+}
 
 export default function Home() {
   const [products, setProducts] = useState<Product[]>([]);
   const [statsProducts, setStatsProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+
   const [totalCount, setTotalCount] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
 
   const [form, setForm] = useState<ProductForm>(emptyForm);
+  const [categoryForm, setCategoryForm] =
+    useState<CategoryForm>(emptyCategoryForm);
+
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingCategoryId, setEditingCategoryId] =
+    useState<string | null>(null);
 
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -128,13 +188,16 @@ export default function Home() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   const [loading, setLoading] = useState(true);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingCategory, setSavingCategory] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deletingCategoryId, setDeletingCategoryId] =
+    useState<string | null>(null);
 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  // Debounce search to avoid sending a request for every keystroke.
   useEffect(() => {
     const timeout = window.setTimeout(() => {
       setDebouncedSearch(search.trim());
@@ -143,7 +206,6 @@ export default function Home() {
     return () => window.clearTimeout(timeout);
   }, [search]);
 
-  // Load the current page from the API.
   const loadProducts = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -155,8 +217,6 @@ export default function Home() {
         debouncedSearch
       );
 
-      // If deleting the last item on a page makes that page invalid,
-      // move to the last available page.
       const lastValidPage = Math.max(data.totalPages, 1);
 
       if (page > lastValidPage) {
@@ -186,8 +246,6 @@ export default function Home() {
     return () => window.clearTimeout(timeoutId);
   }, [loadProducts]);
 
-  // Load every product in batches for accurate dashboard statistics.
-  // This is separate from the paginated list.
   const loadDashboardStats = useCallback(async () => {
     try {
       const firstPage = await fetchProducts(1, STATS_PAGE_SIZE);
@@ -209,7 +267,7 @@ export default function Home() {
 
       setStatsProducts(allProducts);
     } catch {
-      // The main product list displays its own loading error.
+      // Keep the dashboard usable if statistics cannot be loaded.
     }
   }, []);
 
@@ -220,6 +278,35 @@ export default function Home() {
 
     return () => window.clearTimeout(timeoutId);
   }, [loadDashboardStats, refreshKey]);
+
+  const loadCategories = useCallback(async () => {
+    setCategoriesLoading(true);
+
+    try {
+      const data = await fetchCategories();
+      setCategories(data);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to load categories."
+      );
+    } finally {
+      setCategoriesLoading(false);
+    }
+  }, [refreshKey]);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      void loadCategories();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [loadCategories]);
+
+  function refreshData() {
+    setRefreshKey((current) => current + 1);
+  }
 
   function updateField<K extends keyof ProductForm>(
     field: K,
@@ -244,6 +331,8 @@ export default function Home() {
       price: String(product.price),
       description: product.description ?? "",
       isAvailable: product.isAvailable,
+      categoryId:
+        product.categoryId ?? product.category?.id ?? "",
     });
 
     setError("");
@@ -275,6 +364,7 @@ export default function Home() {
             name: form.name.trim(),
             price: Number(form.price),
             description: form.description.trim(),
+            categoryId: form.categoryId || null,
             ...(isEditing && {
               isAvailable: form.isAvailable,
             }),
@@ -283,16 +373,12 @@ export default function Home() {
       );
 
       if (!response.ok) {
-        let message = `Request failed (${response.status}).`;
-
-        try {
-          const body = await response.json();
-          message = body.message ?? body.title ?? message;
-        } catch {
-          // Keep the fallback message.
-        }
-
-        throw new Error(message);
+        throw new Error(
+          await readError(
+            response,
+            `Request failed (${response.status}).`
+          )
+        );
       }
 
       setSuccess(
@@ -302,10 +388,8 @@ export default function Home() {
       );
 
       resetForm();
-
-      // Refresh both the list and the dashboard statistics.
       setPage(1);
-      setRefreshKey((current) => current + 1);
+      refreshData();
     } catch (err) {
       setError(
         err instanceof Error
@@ -318,11 +402,13 @@ export default function Home() {
   }
 
   async function handleDelete(product: Product) {
-    const confirmed = window.confirm(
-      `Are you sure you want to delete "${product.name}"?`
-    );
-
-    if (!confirmed) return;
+    if (
+      !window.confirm(
+        `Are you sure you want to delete "${product.name}"?`
+      )
+    ) {
+      return;
+    }
 
     setDeletingId(product.id);
     setError("");
@@ -335,16 +421,12 @@ export default function Home() {
       );
 
       if (!response.ok) {
-        let message = `Could not delete product (${response.status}).`;
-
-        try {
-          const body = await response.json();
-          message = body.message ?? body.title ?? message;
-        } catch {
-          // Keep the fallback message.
-        }
-
-        throw new Error(message);
+        throw new Error(
+          await readError(
+            response,
+            `Could not delete product (${response.status}).`
+          )
+        );
       }
 
       if (editingId === product.id) {
@@ -352,7 +434,7 @@ export default function Home() {
       }
 
       setSuccess("Product deleted successfully.");
-      setRefreshKey((current) => current + 1);
+      refreshData();
     } catch (err) {
       setError(
         err instanceof Error
@@ -379,33 +461,165 @@ export default function Home() {
           body: JSON.stringify({
             name: product.name,
             price: product.price,
-            description: product.description,
+            description: product.description ?? "",
             isAvailable: !product.isAvailable,
+            categoryId:
+              product.categoryId ?? product.category?.id ?? null,
           }),
         }
       );
 
       if (!response.ok) {
-        let message = "Could not update product availability.";
-
-        try {
-          const body = await response.json();
-          message = body.message ?? body.title ?? message;
-        } catch {
-          // Keep the fallback message.
-        }
-
-        throw new Error(message);
+        throw new Error(
+          await readError(
+            response,
+            "Could not update product availability."
+          )
+        );
       }
 
       setSuccess("Product availability updated.");
-      setRefreshKey((current) => current + 1);
+      refreshData();
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
           : "Something went wrong."
       );
+    }
+  }
+
+  function updateCategoryField<K extends keyof CategoryForm>(
+    field: K,
+    value: CategoryForm[K]
+  ) {
+    setCategoryForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  }
+
+  function resetCategoryForm() {
+    setCategoryForm(emptyCategoryForm);
+    setEditingCategoryId(null);
+  }
+
+  function startEditingCategory(category: Category) {
+    setEditingCategoryId(category.id);
+    setCategoryForm({
+      name: category.name,
+      description: category.description ?? "",
+    });
+    setError("");
+    setSuccess("");
+  }
+
+  async function handleCategorySubmit(
+    event: FormEvent<HTMLFormElement>
+  ) {
+    event.preventDefault();
+
+    setSavingCategory(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const isEditing = editingCategoryId !== null;
+
+      const response = await fetch(
+        isEditing
+          ? `${API_URL}/api/categories/${editingCategoryId}`
+          : `${API_URL}/api/categories`,
+        {
+          method: isEditing ? "PUT" : "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: categoryForm.name.trim(),
+            description: categoryForm.description.trim(),
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          await readError(
+            response,
+            `Could not save category (${response.status}).`
+          )
+        );
+      }
+
+      setSuccess(
+        isEditing
+          ? "Category updated successfully."
+          : "Category created successfully."
+      );
+
+      resetCategoryForm();
+      refreshData();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Could not save category."
+      );
+    } finally {
+      setSavingCategory(false);
+    }
+  }
+
+  async function handleCategoryDelete(category: Category) {
+    const confirmed = window.confirm(
+      `Delete category "${category.name}"? Products in this category will remain, but will become uncategorized.`
+    );
+
+    if (!confirmed) return;
+
+    setDeletingCategoryId(category.id);
+    setError("");
+    setSuccess("");
+
+    try {
+      const response = await fetch(
+        `${API_URL}/api/categories/${category.id}`,
+        { method: "DELETE" }
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          await readError(
+            response,
+            `Could not delete category (${response.status}).`
+          )
+        );
+      }
+
+      if (editingCategoryId === category.id) {
+        resetCategoryForm();
+      }
+
+      if (form.categoryId === category.id) {
+        setForm((current) => ({
+          ...current,
+          categoryId: "",
+        }));
+      }
+
+      setSuccess(
+        `Category "${category.name}" deleted. Its products have been preserved.`
+      );
+
+      refreshData();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Could not delete category."
+      );
+    } finally {
+      setDeletingCategoryId(null);
     }
   }
 
@@ -443,11 +657,13 @@ export default function Home() {
 
           <button
             type="button"
-            onClick={() => setRefreshKey((current) => current + 1)}
-            disabled={loading}
+            onClick={refreshData}
+            disabled={loading || categoriesLoading}
             className="rounded-lg border border-slate-700 px-4 py-2.5 text-sm font-medium transition hover:border-emerald-400 hover:text-emerald-400 disabled:opacity-50"
           >
-            {loading ? "Refreshing..." : "↻ Refresh"}
+            {loading || categoriesLoading
+              ? "Refreshing..."
+              : "↻ Refresh"}
           </button>
         </header>
 
@@ -469,7 +685,7 @@ export default function Home() {
           </div>
         )}
 
-        <section className="mb-8 grid gap-4 sm:grid-cols-3">
+        <section className="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard
             label="Total products"
             value={String(totalCount)}
@@ -480,6 +696,12 @@ export default function Home() {
             label="Available"
             value={String(availableCount)}
             detail="Available across all products"
+          />
+
+          <StatCard
+            label="Categories"
+            value={String(categories.length)}
+            detail="Menu categories configured"
           />
 
           <StatCard
@@ -550,6 +772,39 @@ export default function Home() {
                   placeholder="1250.00"
                   className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 outline-none transition placeholder:text-slate-600 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400"
                 />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="productCategory"
+                  className="mb-2 block text-sm font-medium text-slate-300"
+                >
+                  Category
+                </label>
+
+                <select
+                  id="productCategory"
+                  value={form.categoryId}
+                  onChange={(event) =>
+                    updateField("categoryId", event.target.value)
+                  }
+                  disabled={categoriesLoading}
+                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none transition focus:border-emerald-400 disabled:opacity-50"
+                >
+                  <option value="">Uncategorized</option>
+
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+
+                {!categoriesLoading && categories.length === 0 && (
+                  <p className="mt-2 text-xs text-amber-400">
+                    Create a category below to organize your products.
+                  </p>
+                )}
               </div>
 
               <div>
@@ -679,70 +934,83 @@ export default function Home() {
             ) : (
               <>
                 <ul className="divide-y divide-slate-800">
-                  {products.map((product) => (
-                    <li key={product.id} className="py-5">
-                      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="break-words font-semibold text-white">
-                              {product.name}
-                            </h3>
+                  {products.map((product) => {
+                    const categoryName =
+                      product.category?.name ??
+                      categories.find(
+                        (category) =>
+                          category.id === product.categoryId
+                      )?.name;
 
-                            <span
-                              className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                                product.isAvailable
-                                  ? "bg-emerald-950 text-emerald-400"
-                                  : "bg-slate-800 text-slate-400"
-                              }`}
-                            >
-                              {product.isAvailable
-                                ? "Available"
-                                : "Unavailable"}
-                            </span>
+                    return (
+                      <li key={product.id} className="py-5">
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h3 className="break-words font-semibold text-white">
+                                {product.name}
+                              </h3>
+
+                              <span
+                                className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                                  product.isAvailable
+                                    ? "bg-emerald-950 text-emerald-400"
+                                    : "bg-slate-800 text-slate-400"
+                                }`}
+                              >
+                                {product.isAvailable
+                                  ? "Available"
+                                  : "Unavailable"}
+                              </span>
+                            </div>
+
+                            <p className="mt-2 text-xs text-sky-400">
+                              {categoryName ?? "Uncategorized"}
+                            </p>
+
+                            <p className="mt-2 whitespace-pre-wrap break-words text-sm text-slate-400">
+                              {product.description || "No description"}
+                            </p>
+
+                            <p className="mt-3 font-semibold text-emerald-400">
+                              {formatPrice(product.price)}
+                            </p>
                           </div>
 
-                          <p className="mt-2 whitespace-pre-wrap break-words text-sm text-slate-400">
-                            {product.description || "No description"}
-                          </p>
+                          <div className="flex shrink-0 flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void toggleAvailability(product)
+                              }
+                              className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 transition hover:border-emerald-400 hover:text-emerald-400"
+                            >
+                              {product.isAvailable ? "Disable" : "Enable"}
+                            </button>
 
-                          <p className="mt-3 font-semibold text-emerald-400">
-                            {formatPrice(product.price)}
-                          </p>
+                            <button
+                              type="button"
+                              onClick={() => startEditing(product)}
+                              className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 transition hover:border-sky-400 hover:text-sky-400"
+                            >
+                              Edit
+                            </button>
+
+                            <button
+                              type="button"
+                              disabled={deletingId === product.id}
+                              onClick={() => void handleDelete(product)}
+                              className="rounded-lg border border-red-900/70 px-3 py-2 text-sm text-red-400 transition hover:bg-red-950 disabled:opacity-50"
+                            >
+                              {deletingId === product.id
+                                ? "Deleting..."
+                                : "Delete"}
+                            </button>
+                          </div>
                         </div>
-
-                        <div className="flex shrink-0 flex-wrap gap-2">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              void toggleAvailability(product)
-                            }
-                            className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 transition hover:border-emerald-400 hover:text-emerald-400"
-                          >
-                            {product.isAvailable ? "Disable" : "Enable"}
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => startEditing(product)}
-                            className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 transition hover:border-sky-400 hover:text-sky-400"
-                          >
-                            Edit
-                          </button>
-
-                          <button
-                            type="button"
-                            disabled={deletingId === product.id}
-                            onClick={() => void handleDelete(product)}
-                            className="rounded-lg border border-red-900/70 px-3 py-2 text-sm text-red-400 transition hover:bg-red-950 disabled:opacity-50"
-                          >
-                            {deletingId === product.id
-                              ? "Deleting..."
-                              : "Delete"}
-                          </button>
-                        </div>
-                      </div>
-                    </li>
-                  ))}
+                      </li>
+                    );
+                  })}
                 </ul>
 
                 <div className="mt-5 flex flex-col gap-4 border-t border-slate-800 pt-5 sm:flex-row sm:items-center sm:justify-between">
@@ -786,6 +1054,181 @@ export default function Home() {
             )}
           </section>
         </div>
+
+        <section className="mt-6 rounded-2xl border border-slate-800 bg-slate-900 p-5 sm:p-6">
+          <div className="mb-6">
+            <p className="text-xs font-semibold uppercase tracking-widest text-emerald-400">
+              Menu organization
+            </p>
+
+            <h2 className="mt-2 text-xl font-semibold">
+              Category management
+            </h2>
+
+            <p className="mt-1 text-sm text-slate-400">
+              Organize your menu into categories such as Burgers, Drinks,
+              Desserts, and Main Courses.
+            </p>
+          </div>
+
+          <div className="grid items-start gap-6 lg:grid-cols-[0.8fr_1.2fr]">
+            <form
+              onSubmit={handleCategorySubmit}
+              className="space-y-4 rounded-xl border border-slate-800 bg-slate-950/50 p-4"
+            >
+              <h3 className="font-semibold">
+                {editingCategoryId ? "Edit category" : "Create category"}
+              </h3>
+
+              <div>
+                <label
+                  htmlFor="categoryName"
+                  className="mb-2 block text-sm font-medium text-slate-300"
+                >
+                  Category name
+                </label>
+
+                <input
+                  id="categoryName"
+                  required
+                  minLength={1}
+                  maxLength={100}
+                  value={categoryForm.name}
+                  onChange={(event) =>
+                    updateCategoryField("name", event.target.value)
+                  }
+                  placeholder="e.g. Burgers"
+                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 outline-none transition placeholder:text-slate-600 focus:border-emerald-400"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="categoryDescription"
+                  className="mb-2 block text-sm font-medium text-slate-300"
+                >
+                  Description
+                </label>
+
+                <textarea
+                  id="categoryDescription"
+                  maxLength={500}
+                  rows={3}
+                  value={categoryForm.description}
+                  onChange={(event) =>
+                    updateCategoryField(
+                      "description",
+                      event.target.value
+                    )
+                  }
+                  placeholder="Optional category description..."
+                  className="w-full resize-y rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 outline-none transition placeholder:text-slate-600 focus:border-emerald-400"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={savingCategory}
+                className="w-full rounded-lg bg-emerald-500 px-4 py-3 font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:opacity-50"
+              >
+                {savingCategory
+                  ? "Saving..."
+                  : editingCategoryId
+                    ? "Save category"
+                    : "Create category"}
+              </button>
+
+              {editingCategoryId && (
+                <button
+                  type="button"
+                  onClick={resetCategoryForm}
+                  disabled={savingCategory}
+                  className="w-full rounded-lg border border-slate-700 px-4 py-3 text-sm text-slate-300 transition hover:bg-slate-800 disabled:opacity-50"
+                >
+                  Cancel editing
+                </button>
+              )}
+            </form>
+
+            <div>
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <h3 className="font-semibold">Your categories</h3>
+
+                <span className="rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-300">
+                  {categories.length} total
+                </span>
+              </div>
+
+              {categoriesLoading ? (
+                <p className="rounded-xl border border-slate-800 p-6 text-sm text-slate-400">
+                  Loading categories...
+                </p>
+              ) : categories.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-slate-700 p-8 text-center">
+                  <p className="font-medium text-slate-300">
+                    No categories yet
+                  </p>
+                  <p className="mt-2 text-sm text-slate-500">
+                    Create your first category using the form.
+                  </p>
+                </div>
+              ) : (
+                <ul className="divide-y divide-slate-800 rounded-xl border border-slate-800">
+                  {categories.map((category) => (
+                    <li
+                      key={category.id}
+                      className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h4 className="break-words font-medium text-white">
+                            {category.name}
+                          </h4>
+
+                          <span className="rounded-full bg-slate-800 px-2 py-1 text-xs text-slate-400">
+                            {category.productCount ?? 0}{" "}
+                            {(category.productCount ?? 0) === 1
+                              ? "product"
+                              : "products"}
+                          </span>
+                        </div>
+
+                        {category.description && (
+                          <p className="mt-1 break-words text-sm text-slate-400">
+                            {category.description}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="flex shrink-0 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => startEditingCategory(category)}
+                          className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 transition hover:border-sky-400 hover:text-sky-400"
+                        >
+                          Edit
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={deletingCategoryId === category.id}
+                          onClick={() =>
+                            void handleCategoryDelete(category)
+                          }
+                          className="rounded-lg border border-red-900/70 px-3 py-2 text-sm text-red-400 transition hover:bg-red-950 disabled:opacity-50"
+                        >
+                          {deletingCategoryId === category.id
+                            ? "Deleting..."
+                            : "Delete"}
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </section>
 
         <footer className="mt-10 border-t border-slate-800 pt-5 text-center text-xs text-slate-500">
           ServeFlow · Restaurant management system

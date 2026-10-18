@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 
 namespace ServeFlow.Domain.Entities;
 
@@ -11,6 +12,6 @@ public class Category
 
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
 
-    public ICollection<Product> Products { get; set; }
-        = new List<Product>();
+    [JsonIgnore]
+    public ICollection<Product> Products { get; set; } = new List<Product>();
 }

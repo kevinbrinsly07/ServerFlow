@@ -14,5 +14,7 @@ public record UpdateProductRequest(
     [StringLength(1000)]
     string? Description,
 
-    bool IsAvailable
+    bool IsAvailable,
+
+    Guid? CategoryId = null
 );

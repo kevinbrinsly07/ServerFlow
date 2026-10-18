@@ -18,64 +18,69 @@ public class ProductsController : ControllerBase
         _dbContext = dbContext;
     }
 
-    
-[HttpGet]
-public async Task<IActionResult> GetProducts(
-    [FromQuery] string? search,
-    [FromQuery] int page = 1,
-    [FromQuery] int pageSize = 10)
-{
-    page = Math.Max(page, 1);
-    pageSize = Math.Clamp(pageSize, 1, 100);
-
-    var query = _dbContext.Products.AsNoTracking();
-
-    if (!string.IsNullOrWhiteSpace(search))
+    // GET: api/products
+    [HttpGet]
+    public async Task<IActionResult> GetProducts(
+        [FromQuery] string? search,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10)
     {
-        var searchTerm = search.Trim().ToLower();
+        page = Math.Max(page, 1);
+        pageSize = Math.Clamp(pageSize, 1, 100);
 
-        query = query.Where(product =>
-            product.Name.ToLower().Contains(searchTerm) ||
-            product.Description.ToLower().Contains(searchTerm));
+        var query = _dbContext.Products
+            .AsNoTracking()
+            .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var searchTerm = search.Trim().ToLower();
+
+            query = query.Where(product =>
+                product.Name.ToLower().Contains(searchTerm) ||
+                product.Description.ToLower().Contains(searchTerm));
+        }
+
+        var totalCount = await query.CountAsync();
+
+        var products = await query
+            .Include(product => product.Category)
+            .OrderBy(product => product.Name)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        var totalPages = (int)Math.Ceiling(
+            totalCount / (double)pageSize);
+
+        return Ok(new
+        {
+            items = products,
+            page,
+            pageSize,
+            totalCount,
+            totalPages
+        });
     }
 
-    var totalCount = await query.CountAsync();
-
-    var products = await query
-        .OrderBy(product => product.Name)
-        .Skip((page - 1) * pageSize)
-        .Take(pageSize)
-        .ToListAsync();
-
-    var totalPages = (int)Math.Ceiling(
-        totalCount / (double)pageSize);
-
-    return Ok(new
-    {
-        items = products,
-        page,
-        pageSize,
-        totalCount,
-        totalPages
-    });
-}
-
-
+    // GET: api/products/{id}
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<Product>> GetProduct(Guid id)
     {
         var product = await _dbContext.Products
             .AsNoTracking()
-            .FirstOrDefaultAsync(product => product.Id == id);
+            .Include(item => item.Category)
+            .FirstOrDefaultAsync(item => item.Id == id);
 
         if (product is null)
         {
             return NotFound();
         }
 
-        return Ok(product);
+        return product;
     }
 
+    // POST: api/products
     [HttpPost]
     public async Task<ActionResult<Product>> CreateProduct(
         CreateProductRequest request)
@@ -88,7 +93,9 @@ public async Task<IActionResult> GetProducts(
             });
         }
 
-        if (request.Name.Trim().Length > 150)
+        var name = request.Name.Trim();
+
+        if (name.Length > 150)
         {
             return BadRequest(new
             {
@@ -104,11 +111,30 @@ public async Task<IActionResult> GetProducts(
             });
         }
 
+        Category? category = null;
+
+        if (request.CategoryId.HasValue)
+        {
+            category = await _dbContext.Categories
+                .FirstOrDefaultAsync(
+                    item => item.Id == request.CategoryId.Value);
+
+            if (category is null)
+            {
+                return BadRequest(new
+                {
+                    message = "The selected category does not exist."
+                });
+            }
+        }
+
         var product = new Product
         {
-            Name = request.Name.Trim(),
+            Name = name,
             Description = request.Description?.Trim() ?? string.Empty,
-            Price = request.Price
+            Price = request.Price,
+            CategoryId = category?.Id,
+            Category = category
         };
 
         _dbContext.Products.Add(product);
@@ -120,20 +146,19 @@ public async Task<IActionResult> GetProducts(
             product);
     }
 
+    // PUT: api/products/{id}
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<Product>> UpdateProduct(
         Guid id,
         UpdateProductRequest request)
     {
         var product = await _dbContext.Products
-            .FirstOrDefaultAsync(product => product.Id == id);
+            .Include(item => item.Category)
+            .FirstOrDefaultAsync(item => item.Id == id);
 
         if (product is null)
         {
-            return NotFound(new
-            {
-                message = "Product not found."
-            });
+            return NotFound();
         }
 
         if (string.IsNullOrWhiteSpace(request.Name))
@@ -144,7 +169,9 @@ public async Task<IActionResult> GetProducts(
             });
         }
 
-        if (request.Name.Trim().Length > 150)
+        var name = request.Name.Trim();
+
+        if (name.Length > 150)
         {
             return BadRequest(new
             {
@@ -160,21 +187,41 @@ public async Task<IActionResult> GetProducts(
             });
         }
 
-        product.Name = request.Name.Trim();
+        Category? category = null;
+
+        if (request.CategoryId.HasValue)
+        {
+            category = await _dbContext.Categories
+                .FirstOrDefaultAsync(
+                    item => item.Id == request.CategoryId.Value);
+
+            if (category is null)
+            {
+                return BadRequest(new
+                {
+                    message = "The selected category does not exist."
+                });
+            }
+        }
+
+        product.Name = name;
         product.Description = request.Description?.Trim() ?? string.Empty;
         product.Price = request.Price;
         product.IsAvailable = request.IsAvailable;
+        product.CategoryId = category?.Id;
+        product.Category = category;
 
         await _dbContext.SaveChangesAsync();
 
         return Ok(product);
     }
 
+    // DELETE: api/products/{id}
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> DeleteProduct(Guid id)
     {
         var product = await _dbContext.Products
-            .FirstOrDefaultAsync(product => product.Id == id);
+            .FirstOrDefaultAsync(item => item.Id == id);
 
         if (product is null)
         {
