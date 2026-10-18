@@ -1,13 +1,10 @@
-
 "use client";
+
+import Link from "next/link";
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  API_URL,
-  saveSession,
-  type LoginResponse,
-} from "@/lib/auth";
+import { API_URL, saveSession, type LoginResponse } from "@/lib/auth";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -38,7 +35,7 @@ export default function LoginPage() {
 
       if (!response.ok) {
         throw new Error(
-          data.message ?? data.title ?? "Invalid email or password."
+          data.message ?? data.title ?? "Invalid email or password.",
         );
       }
 
@@ -48,7 +45,7 @@ export default function LoginPage() {
       setError(
         err instanceof Error
           ? err.message
-          : "Unable to sign in. Please try again."
+          : "Unable to sign in. Please try again.",
       );
     } finally {
       setLoading(false);
@@ -116,6 +113,16 @@ export default function LoginPage() {
         >
           {loading ? "Signing in..." : "Sign in"}
         </button>
+
+        <p className="text-center text-sm text-slate-400">
+          Don&apos;t have an account?{" "}
+          <Link
+            href="/register"
+            className="font-medium text-emerald-400 hover:text-emerald-300"
+          >
+            Create account
+          </Link>
+        </p>
       </form>
     </main>
   );
