@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using ServeFlow.Infrastructure.Data;
 using ServeFlow.Infrastructure.Identity;
+using ServeFlow.Infrastructure.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -24,6 +25,8 @@ if (string.IsNullOrWhiteSpace(connectionString))
 
 builder.Services.AddDbContext<ServeFlowDbContext>(options =>
     options.UseNpgsql(connectionString));
+
+builder.Services.AddScoped<AuditLogService>();
 
 // ASP.NET Core Identity
 builder.Services

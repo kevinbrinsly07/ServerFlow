@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using ServeFlow.Api.Contracts.Products;
 using ServeFlow.Domain.Entities;
 using ServeFlow.Infrastructure.Data;
+using ServeFlow.Infrastructure.Services;
 
 namespace ServeFlow.Api.Controllers;
 
@@ -13,10 +14,14 @@ namespace ServeFlow.Api.Controllers;
 public class ProductsController : ControllerBase
 {
     private readonly ServeFlowDbContext _dbContext;
+    private readonly AuditLogService _auditLogService;
 
-    public ProductsController(ServeFlowDbContext dbContext)
+    public ProductsController(
+        ServeFlowDbContext dbContext,
+        AuditLogService auditLogService)
     {
         _dbContext = dbContext;
+        _auditLogService = auditLogService;
     }
 
     // GET: api/products
@@ -143,6 +148,14 @@ public class ProductsController : ControllerBase
         };
 
         _dbContext.Products.Add(product);
+
+        _auditLogService.Add(
+            User,
+            "Created",
+            "Product",
+            product.Id.ToString(),
+            $"Created product '{product.Name}'.");
+
         await _dbContext.SaveChangesAsync();
 
         return CreatedAtAction(
@@ -218,6 +231,13 @@ public class ProductsController : ControllerBase
         product.CategoryId = category?.Id;
         product.Category = category;
 
+        _auditLogService.Add(
+            User,
+            "Updated",
+            "Product",
+            product.Id.ToString(),
+            $"Updated product '{product.Name}'.");
+
         await _dbContext.SaveChangesAsync();
 
         return Ok(product);
@@ -239,6 +259,13 @@ public class ProductsController : ControllerBase
                 message = "Product not found."
             });
         }
+
+        _auditLogService.Add(
+            User,
+            "Deleted",
+            "Product",
+            product.Id.ToString(),
+            $"Deleted product '{product.Name}'.");
 
         _dbContext.Products.Remove(product);
         await _dbContext.SaveChangesAsync();
