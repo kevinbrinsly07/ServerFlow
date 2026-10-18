@@ -352,4 +352,59 @@ public class ProductsApiIntegrationTests : IAsyncLifetime
             "Tea",
             items[0].GetProperty("name").GetString());
     }
+
+
+    [Fact]
+    public async Task CreateProduct_WithoutAuthentication_ReturnsUnauthorized()
+    {
+        using var request = new HttpRequestMessage(
+            HttpMethod.Post,
+            "/api/products")
+        {
+            Content = JsonContent.Create(new
+            {
+                name = "Unauthorized Product",
+                price = 100m,
+                description = "Should not be created"
+            })
+        };
+
+        request.Headers.Add("X-Test-Role", "none");
+
+        var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteProduct_AsStaff_ReturnsForbidden()
+    {
+        // The default test role is Admin, so create the product first.
+        var createResponse = await _client.PostAsJsonAsync(
+            "/api/products",
+            new
+            {
+                name = "Protected Product",
+                price = 500m,
+                description = "Used for authorization testing"
+            });
+
+        Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
+
+        var created = await createResponse.Content
+            .ReadFromJsonAsync<Product>();
+
+        Assert.NotNull(created);
+
+        using var request = new HttpRequestMessage(
+            HttpMethod.Delete,
+            $"/api/products/{created.Id}");
+
+        request.Headers.Add("X-Test-Role", "Staff");
+
+        var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
 }

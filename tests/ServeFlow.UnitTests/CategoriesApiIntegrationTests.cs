@@ -245,4 +245,27 @@ public class CategoriesApiIntegrationTests : IAsyncLifetime
             JsonValueKind.Null,
             savedProduct.GetProperty("categoryId").ValueKind);
     }
+
+
+    [Fact]
+    public async Task CreateCategory_AsStaff_ReturnsForbidden()
+    {
+        using var request = new HttpRequestMessage(
+            HttpMethod.Post,
+            "/api/categories")
+        {
+            Content = JsonContent.Create(new
+            {
+                name = "Staff Restricted Category",
+                description = "Should not be created by Staff"
+            })
+        };
+
+        request.Headers.Add("X-Test-Role", "Staff");
+
+        var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
 }
