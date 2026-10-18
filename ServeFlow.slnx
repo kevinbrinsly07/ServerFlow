@@ -6,5 +6,8 @@
     <Project Path="backend/ServeFlow.Infrastructure/ServeFlow.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/backend/ServeFlow.api/" />
+  <Folder Name="/tests/">
+    <Project Path="tests/ServeFlow.UnitTests/ServeFlow.UnitTests.csproj" />
+  </Folder>
 </Solution>
 
