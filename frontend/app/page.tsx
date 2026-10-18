@@ -1,6 +1,12 @@
+
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import {
+  FormEvent,
+  useCallback,
+  useEffect,
+  useState,
+} from "react";
 
 type Product = {
   id: string;
@@ -18,8 +24,19 @@ type ProductForm = {
   isAvailable: boolean;
 };
 
+type ProductsResponse = {
+  items: Product[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+};
+
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5080";
+
+const PAGE_SIZE = 10;
+const STATS_PAGE_SIZE = 100;
 
 const emptyForm: ProductForm = {
   name: "",
@@ -35,47 +52,174 @@ function formatPrice(price: number) {
   })}`;
 }
 
+
+async function fetchProducts(
+  page: number,
+  pageSize: number,
+  search = ""
+): Promise<ProductsResponse> {
+  const params = new URLSearchParams({
+    page: String(page),
+    pageSize: String(pageSize),
+  });
+
+  if (search.trim()) {
+    params.set("search", search.trim());
+  }
+
+  const response = await fetch(
+    `${API_URL}/api/products?${params.toString()}`,
+    { cache: "no-store" }
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      `Could not load products. API returned ${response.status}.`
+    );
+  }
+
+  const data: unknown = await response.json();
+
+  if (
+    typeof data !== "object" ||
+    data === null ||
+    !("items" in data) ||
+    !Array.isArray(data.items)
+  ) {
+    throw new Error(
+      "Unexpected API response. Make sure the backend returns a paginated products object with an items array."
+    );
+  }
+
+  const payload = data as Record<string, unknown>;
+
+  return {
+    items: payload.items as Product[],
+    page:
+      typeof payload.page === "number" ? payload.page : page,
+    pageSize:
+      typeof payload.pageSize === "number" ? payload.pageSize : pageSize,
+    totalCount:
+      typeof payload.totalCount === "number"
+        ? payload.totalCount
+        : (payload.items as unknown[]).length,
+    totalPages:
+      typeof payload.totalPages === "number"
+        ? payload.totalPages
+        : Math.ceil((payload.items as unknown[]).length / pageSize),
+  };
+}
+
+
+
+
 export default function Home() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [statsProducts, setStatsProducts] = useState<Product[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+
   const [form, setForm] = useState<ProductForm>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
+
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [refreshKey, setRefreshKey] = useState(0);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  // Debounce search to avoid sending a request for every keystroke.
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setDebouncedSearch(search.trim());
+    }, 300);
+
+    return () => window.clearTimeout(timeout);
+  }, [search]);
+
+  // Load the current page from the API.
   const loadProducts = useCallback(async () => {
     setLoading(true);
     setError("");
 
     try {
-      const response = await fetch(`${API_URL}/api/products`, {
-        cache: "no-store",
-      });
+      const data = await fetchProducts(
+        page,
+        PAGE_SIZE,
+        debouncedSearch
+      );
 
-      if (!response.ok) {
-        throw new Error("Could not load products.");
+      // If deleting the last item on a page makes that page invalid,
+      // move to the last available page.
+      const lastValidPage = Math.max(data.totalPages, 1);
+
+      if (page > lastValidPage) {
+        setPage(lastValidPage);
+        return;
       }
 
-      const data: Product[] = await response.json();
-
-      setProducts(
-        data.sort((a, b) => a.name.localeCompare(b.name))
-      );
-    } catch {
+      setProducts(Array.isArray(data.items) ? data.items : []);
+      setTotalCount(data.totalCount);
+      setTotalPages(data.totalPages);
+    } catch (err) {
       setError(
-        "Unable to connect to ServeFlow. Check that the API and database are running."
+        err instanceof Error
+          ? err.message
+          : "Unable to load products."
       );
     } finally {
       setLoading(false);
     }
+  }, [page, debouncedSearch, refreshKey]);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      void loadProducts();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [loadProducts]);
+
+  // Load every product in batches for accurate dashboard statistics.
+  // This is separate from the paginated list.
+  const loadDashboardStats = useCallback(async () => {
+    try {
+      const firstPage = await fetchProducts(1, STATS_PAGE_SIZE);
+      const allProducts = [...firstPage.items];
+
+      if (firstPage.totalPages > 1) {
+        const remainingPages = await Promise.all(
+          Array.from(
+            { length: firstPage.totalPages - 1 },
+            (_, index) =>
+              fetchProducts(index + 2, STATS_PAGE_SIZE)
+          )
+        );
+
+        for (const result of remainingPages) {
+          allProducts.push(...result.items);
+        }
+      }
+
+      setStatsProducts(allProducts);
+    } catch {
+      // The main product list displays its own loading error.
+    }
   }, []);
 
   useEffect(() => {
-    void loadProducts();
-  }, [loadProducts]);
+    const timeoutId = window.setTimeout(() => {
+      void loadDashboardStats();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [loadDashboardStats, refreshKey]);
 
   function updateField<K extends keyof ProductForm>(
     field: K,
@@ -145,27 +289,11 @@ export default function Home() {
           const body = await response.json();
           message = body.message ?? body.title ?? message;
         } catch {
-          // Keep the fallback message if the response isn't JSON.
+          // Keep the fallback message.
         }
 
         throw new Error(message);
       }
-
-      const savedProduct: Product = await response.json();
-
-      setProducts((current) => {
-        const updated = isEditing
-          ? current.map((product) =>
-              product.id === savedProduct.id
-                ? savedProduct
-                : product
-            )
-          : [...current, savedProduct];
-
-        return updated.sort((a, b) =>
-          a.name.localeCompare(b.name)
-        );
-      });
 
       setSuccess(
         isEditing
@@ -174,6 +302,10 @@ export default function Home() {
       );
 
       resetForm();
+
+      // Refresh both the list and the dashboard statistics.
+      setPage(1);
+      setRefreshKey((current) => current + 1);
     } catch (err) {
       setError(
         err instanceof Error
@@ -209,21 +341,18 @@ export default function Home() {
           const body = await response.json();
           message = body.message ?? body.title ?? message;
         } catch {
-          // Use the fallback message.
+          // Keep the fallback message.
         }
 
         throw new Error(message);
       }
-
-      setProducts((current) =>
-        current.filter((item) => item.id !== product.id)
-      );
 
       if (editingId === product.id) {
         resetForm();
       }
 
       setSuccess("Product deleted successfully.");
+      setRefreshKey((current) => current + 1);
     } catch (err) {
       setError(
         err instanceof Error
@@ -257,18 +386,20 @@ export default function Home() {
       );
 
       if (!response.ok) {
-        throw new Error("Could not update product availability.");
+        let message = "Could not update product availability.";
+
+        try {
+          const body = await response.json();
+          message = body.message ?? body.title ?? message;
+        } catch {
+          // Keep the fallback message.
+        }
+
+        throw new Error(message);
       }
 
-      const updatedProduct: Product = await response.json();
-
-      setProducts((current) =>
-        current.map((item) =>
-          item.id === updatedProduct.id ? updatedProduct : item
-        )
-      );
-
       setSuccess("Product availability updated.");
+      setRefreshKey((current) => current + 1);
     } catch (err) {
       setError(
         err instanceof Error
@@ -278,23 +409,19 @@ export default function Home() {
     }
   }
 
-  const filteredProducts = products.filter((product) => {
-    const query = search.trim().toLowerCase();
-
-    return (
-      product.name.toLowerCase().includes(query) ||
-      product.description.toLowerCase().includes(query)
-    );
-  });
-
-  const availableCount = products.filter(
+  const availableCount = statsProducts.filter(
     (product) => product.isAvailable
   ).length;
 
-  const listedValue = products.reduce(
+  const listedValue = statsProducts.reduce(
     (total, product) => total + product.price,
     0
   );
+
+  const firstResult =
+    totalCount === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+
+  const lastResult = Math.min(page * PAGE_SIZE, totalCount);
 
   return (
     <main className="min-h-screen bg-slate-950 px-4 py-8 text-white sm:px-6 lg:px-10">
@@ -316,7 +443,7 @@ export default function Home() {
 
           <button
             type="button"
-            onClick={() => void loadProducts()}
+            onClick={() => setRefreshKey((current) => current + 1)}
             disabled={loading}
             className="rounded-lg border border-slate-700 px-4 py-2.5 text-sm font-medium transition hover:border-emerald-400 hover:text-emerald-400 disabled:opacity-50"
           >
@@ -345,20 +472,20 @@ export default function Home() {
         <section className="mb-8 grid gap-4 sm:grid-cols-3">
           <StatCard
             label="Total products"
-            value={String(products.length)}
-            detail="All menu items"
+            value={String(totalCount)}
+            detail="Products matching the current search"
           />
 
           <StatCard
             label="Available"
             value={String(availableCount)}
-            detail="Currently available"
+            detail="Available across all products"
           />
 
           <StatCard
             label="Combined listed prices"
             value={formatPrice(listedValue)}
-            detail="Sum of each product's price"
+            detail="Sum of all product prices"
           />
         </section>
 
@@ -499,8 +626,8 @@ export default function Home() {
               </div>
 
               <span className="w-fit rounded-full bg-slate-800 px-3 py-1 text-sm text-slate-300">
-                {filteredProducts.length}{" "}
-                {filteredProducts.length === 1 ? "product" : "products"}
+                {totalCount}{" "}
+                {totalCount === 1 ? "product" : "products"}
               </span>
             </div>
 
@@ -513,7 +640,10 @@ export default function Home() {
                 id="search"
                 type="search"
                 value={search}
-                onChange={(event) => setSearch(event.target.value)}
+                onChange={(event) => {
+                  setSearch(event.target.value);
+                  setPage(1);
+                }}
                 placeholder="Search products..."
                 className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 outline-none placeholder:text-slate-600 focus:border-emerald-400"
               />
@@ -532,87 +662,127 @@ export default function Home() {
                   Loading products...
                 </p>
               </div>
-            ) : filteredProducts.length === 0 ? (
+            ) : products.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-700 px-4 py-12 text-center">
                 <p className="font-medium text-slate-300">
-                  {search
+                  {debouncedSearch
                     ? "No matching products found."
                     : "No menu items yet."}
                 </p>
 
                 <p className="mt-2 text-sm text-slate-500">
-                  {search
+                  {debouncedSearch
                     ? "Try a different search term."
                     : "Add your first product using the form."}
                 </p>
               </div>
             ) : (
-              <ul className="divide-y divide-slate-800">
-                {filteredProducts.map((product) => (
-                  <li key={product.id} className="py-5">
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="break-words font-semibold text-white">
-                            {product.name}
-                          </h3>
+              <>
+                <ul className="divide-y divide-slate-800">
+                  {products.map((product) => (
+                    <li key={product.id} className="py-5">
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="break-words font-semibold text-white">
+                              {product.name}
+                            </h3>
 
-                          <span
-                            className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                              product.isAvailable
-                                ? "bg-emerald-950 text-emerald-400"
-                                : "bg-slate-800 text-slate-400"
-                            }`}
-                          >
-                            {product.isAvailable
-                              ? "Available"
-                              : "Unavailable"}
-                          </span>
+                            <span
+                              className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                                product.isAvailable
+                                  ? "bg-emerald-950 text-emerald-400"
+                                  : "bg-slate-800 text-slate-400"
+                              }`}
+                            >
+                              {product.isAvailable
+                                ? "Available"
+                                : "Unavailable"}
+                            </span>
+                          </div>
+
+                          <p className="mt-2 whitespace-pre-wrap break-words text-sm text-slate-400">
+                            {product.description || "No description"}
+                          </p>
+
+                          <p className="mt-3 font-semibold text-emerald-400">
+                            {formatPrice(product.price)}
+                          </p>
                         </div>
 
-                        <p className="mt-2 whitespace-pre-wrap break-words text-sm text-slate-400">
-                          {product.description || "No description"}
-                        </p>
+                        <div className="flex shrink-0 flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void toggleAvailability(product)
+                            }
+                            className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 transition hover:border-emerald-400 hover:text-emerald-400"
+                          >
+                            {product.isAvailable ? "Disable" : "Enable"}
+                          </button>
 
-                        <p className="mt-3 font-semibold text-emerald-400">
-                          {formatPrice(product.price)}
-                        </p>
+                          <button
+                            type="button"
+                            onClick={() => startEditing(product)}
+                            className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 transition hover:border-sky-400 hover:text-sky-400"
+                          >
+                            Edit
+                          </button>
+
+                          <button
+                            type="button"
+                            disabled={deletingId === product.id}
+                            onClick={() => void handleDelete(product)}
+                            className="rounded-lg border border-red-900/70 px-3 py-2 text-sm text-red-400 transition hover:bg-red-950 disabled:opacity-50"
+                          >
+                            {deletingId === product.id
+                              ? "Deleting..."
+                              : "Delete"}
+                          </button>
+                        </div>
                       </div>
+                    </li>
+                  ))}
+                </ul>
 
-                      <div className="flex shrink-0 flex-wrap gap-2">
-                        <button
-                          type="button"
-                          onClick={() => void toggleAvailability(product)}
-                          className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 transition hover:border-emerald-400 hover:text-emerald-400"
-                        >
-                          {product.isAvailable
-                            ? "Disable"
-                            : "Enable"}
-                        </button>
+                <div className="mt-5 flex flex-col gap-4 border-t border-slate-800 pt-5 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm text-slate-400">
+                    Showing {firstResult}–{lastResult} of {totalCount}
+                  </p>
 
-                        <button
-                          type="button"
-                          onClick={() => startEditing(product)}
-                          className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 transition hover:border-sky-400 hover:text-sky-400"
-                        >
-                          Edit
-                        </button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPage((current) => Math.max(1, current - 1))
+                      }
+                      disabled={page <= 1 || loading}
+                      className="rounded-lg border border-slate-700 px-3 py-2 text-sm transition hover:border-emerald-400 hover:text-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Previous
+                    </button>
 
-                        <button
-                          type="button"
-                          disabled={deletingId === product.id}
-                          onClick={() => void handleDelete(product)}
-                          className="rounded-lg border border-red-900/70 px-3 py-2 text-sm text-red-400 transition hover:bg-red-950 disabled:opacity-50"
-                        >
-                          {deletingId === product.id
-                            ? "Deleting..."
-                            : "Delete"}
-                        </button>
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+                    <span className="whitespace-nowrap text-sm text-slate-300">
+                      Page {page} of {Math.max(totalPages, 1)}
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPage((current) =>
+                          Math.min(totalPages, current + 1)
+                        )
+                      }
+                      disabled={
+                        page >= totalPages || loading || totalPages === 0
+                      }
+                      className="rounded-lg border border-slate-700 px-3 py-2 text-sm transition hover:border-emerald-400 hover:text-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              </>
             )}
           </section>
         </div>

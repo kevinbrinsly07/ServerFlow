@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("ServeFlow.Application")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+20771e05edcfe9dd9f6aab079fca2cb2efeb2ee3")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+e06d4874f511c18a4e7f040ed9d81fda847b0115")]
 [assembly: System.Reflection.AssemblyProductAttribute("ServeFlow.Application")]
 [assembly: System.Reflection.AssemblyTitleAttribute("ServeFlow.Application")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
