@@ -35,7 +35,7 @@ type ProductsResponse = {
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5080";
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 5;
 const STATS_PAGE_SIZE = 100;
 
 const emptyForm: ProductForm = {

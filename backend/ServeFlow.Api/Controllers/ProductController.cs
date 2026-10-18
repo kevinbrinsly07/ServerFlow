@@ -23,7 +23,7 @@ public class ProductsController : ControllerBase
 public async Task<IActionResult> GetProducts(
     [FromQuery] string? search,
     [FromQuery] int page = 1,
-    [FromQuery] int pageSize = 10)
+    [FromQuery] int pageSize = 5)
 {
     page = Math.Max(page, 1);
     pageSize = Math.Clamp(pageSize, 1, 100);
