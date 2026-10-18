@@ -1,0 +1,6 @@
+{
+  "ServeFlow.Api, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "\/Users\/kevinbrinsly\/ServerFlow\/backend\/ServeFlow.Api",
+  "ServeFlow.Application, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "\/Users\/kevinbrinsly\/ServerFlow\/backend\/ServeFlow.Application",
+  "ServeFlow.Domain, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "\/Users\/kevinbrinsly\/ServerFlow\/backend\/ServeFlow.Domain",
+  "ServeFlow.Infrastructure, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "\/Users\/kevinbrinsly\/ServerFlow\/backend\/ServeFlow.Infrastructure"
+}

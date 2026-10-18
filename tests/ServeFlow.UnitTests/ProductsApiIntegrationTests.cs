@@ -1,0 +1,205 @@
+
+using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using ServeFlow.Domain.Entities;
+using ServeFlow.Infrastructure.Data;
+using Xunit;
+
+namespace ServeFlow.UnitTests;
+
+public class ProductsApiFactory : WebApplicationFactory<Program>
+{
+    private readonly string _databaseName = Guid.NewGuid().ToString();
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<
+                IDbContextOptionsConfiguration<ServeFlowDbContext>>();
+
+            services.RemoveAll<DbContextOptions<ServeFlowDbContext>>();
+            services.RemoveAll<ServeFlowDbContext>();
+
+            services.AddDbContext<ServeFlowDbContext>(options =>
+                options.UseInMemoryDatabase(_databaseName));
+        });
+    }
+}
+
+public class ProductsApiIntegrationTests
+    : IClassFixture<ProductsApiFactory>
+{
+    private readonly HttpClient _client;
+
+    public ProductsApiIntegrationTests(ProductsApiFactory factory)
+    {
+        _client = factory.CreateClient();
+    }
+
+    [Fact]
+    public async Task GetProducts_ReturnsSuccess()
+    {
+        var response = await _client.GetAsync("/api/products");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var products = await response.Content
+            .ReadFromJsonAsync<List<Product>>();
+
+        Assert.NotNull(products);
+    }
+
+    [Fact]
+    public async Task CreateProduct_ReturnsCreatedProduct()
+    {
+        var request = new
+        {
+            name = "Integration Test Burger",
+            price = 1250m,
+            description = "Created through HTTP"
+        };
+
+        var response = await _client.PostAsJsonAsync(
+            "/api/products", request);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var product = await response.Content
+            .ReadFromJsonAsync<Product>();
+
+        Assert.NotNull(product);
+        Assert.NotEqual(Guid.Empty, product.Id);
+        Assert.Equal("Integration Test Burger", product.Name);
+        Assert.Equal(1250m, product.Price);
+    }
+
+    [Fact]
+    public async Task GetProduct_ReturnsProductAfterCreation()
+    {
+        var request = new
+        {
+            name = "Read Test Product",
+            price = 900m,
+            description = "Test description"
+        };
+
+        var createResponse = await _client.PostAsJsonAsync(
+            "/api/products", request);
+
+        Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
+
+        var created = await createResponse.Content
+            .ReadFromJsonAsync<Product>();
+
+        Assert.NotNull(created);
+
+        var response = await _client.GetAsync(
+            $"/api/products/{created.Id}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var product = await response.Content
+            .ReadFromJsonAsync<Product>();
+
+        Assert.NotNull(product);
+        Assert.Equal(created.Id, product.Id);
+        Assert.Equal("Read Test Product", product.Name);
+    }
+
+    [Fact]
+    public async Task UpdateProduct_ChangesProduct()
+    {
+        var createResponse = await _client.PostAsJsonAsync(
+            "/api/products",
+            new
+            {
+                name = "Original Product",
+                price = 1000m,
+                description = "Original description"
+            });
+
+        Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
+
+        var created = await createResponse.Content
+            .ReadFromJsonAsync<Product>();
+
+        Assert.NotNull(created);
+
+        var updateResponse = await _client.PutAsJsonAsync(
+            $"/api/products/{created.Id}",
+            new
+            {
+                name = "Updated Product",
+                price = 1500m,
+                description = "Updated description",
+                isAvailable = false
+            });
+
+        Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
+
+        var updated = await updateResponse.Content
+            .ReadFromJsonAsync<Product>();
+
+        Assert.NotNull(updated);
+        Assert.Equal("Updated Product", updated.Name);
+        Assert.Equal(1500m, updated.Price);
+        Assert.False(updated.IsAvailable);
+    }
+
+    [Fact]
+    public async Task DeleteProduct_RemovesProduct()
+    {
+        var createResponse = await _client.PostAsJsonAsync(
+            "/api/products",
+            new
+            {
+                name = "Product To Delete",
+                price = 500m,
+                description = "Temporary product"
+            });
+
+        Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
+
+        var created = await createResponse.Content
+            .ReadFromJsonAsync<Product>();
+
+        Assert.NotNull(created);
+
+        var deleteResponse = await _client.DeleteAsync(
+            $"/api/products/{created.Id}");
+
+        Assert.Equal(
+            HttpStatusCode.NoContent,
+            deleteResponse.StatusCode);
+
+        var getResponse = await _client.GetAsync(
+            $"/api/products/{created.Id}");
+
+        Assert.Equal(HttpStatusCode.NotFound, getResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateProduct_ReturnsBadRequestForInvalidPrice()
+    {
+        var response = await _client.PostAsJsonAsync(
+            "/api/products",
+            new
+            {
+                name = "Invalid Product",
+                price = 0m,
+                description = "Invalid price test"
+            });
+
+        Assert.Equal(
+            HttpStatusCode.BadRequest,
+            response.StatusCode);
+    }
+}
