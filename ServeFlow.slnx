@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/backend/">
+    <Project Path="backend/ServeFlow.Api/ServeFlow.Api.csproj" />
+    <Project Path="backend/ServeFlow.Application/ServeFlow.Application.csproj" />
+    <Project Path="backend/ServeFlow.Domain/ServeFlow.Domain.csproj" />
+    <Project Path="backend/ServeFlow.Infrastructure/ServeFlow.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/backend/ServeFlow.api/" />
+</Solution>
+

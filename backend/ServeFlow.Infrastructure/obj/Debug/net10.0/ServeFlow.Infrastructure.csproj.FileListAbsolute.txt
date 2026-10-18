@@ -1,0 +1,17 @@
+/Users/kevinbrinsly/ServerFlow/backend/ServeFlow.Infrastructure/bin/Debug/net10.0/ServeFlow.Infrastructure.deps.json
+/Users/kevinbrinsly/ServerFlow/backend/ServeFlow.Infrastructure/bin/Debug/net10.0/ServeFlow.Infrastructure.dll
+/Users/kevinbrinsly/ServerFlow/backend/ServeFlow.Infrastructure/bin/Debug/net10.0/ServeFlow.Infrastructure.pdb
+/Users/kevinbrinsly/ServerFlow/backend/ServeFlow.Infrastructure/bin/Debug/net10.0/ServeFlow.Application.dll
+/Users/kevinbrinsly/ServerFlow/backend/ServeFlow.Infrastructure/bin/Debug/net10.0/ServeFlow.Domain.dll
+/Users/kevinbrinsly/ServerFlow/backend/ServeFlow.Infrastructure/bin/Debug/net10.0/ServeFlow.Application.pdb
+/Users/kevinbrinsly/ServerFlow/backend/ServeFlow.Infrastructure/bin/Debug/net10.0/ServeFlow.Domain.pdb
+/Users/kevinbrinsly/ServerFlow/backend/ServeFlow.Infrastructure/obj/Debug/net10.0/ServeFlow.Infrastructure.csproj.AssemblyReference.cache
+/Users/kevinbrinsly/ServerFlow/backend/ServeFlow.Infrastructure/obj/Debug/net10.0/ServeFlow.Infrastructure.GeneratedMSBuildEditorConfig.editorconfig
+/Users/kevinbrinsly/ServerFlow/backend/ServeFlow.Infrastructure/obj/Debug/net10.0/ServeFlow.Infrastructure.AssemblyInfoInputs.cache
+/Users/kevinbrinsly/ServerFlow/backend/ServeFlow.Infrastructure/obj/Debug/net10.0/ServeFlow.Infrastructure.AssemblyInfo.cs
+/Users/kevinbrinsly/ServerFlow/backend/ServeFlow.Infrastructure/obj/Debug/net10.0/ServeFlow.Infrastructure.csproj.CoreCompileInputs.cache
+/Users/kevinbrinsly/ServerFlow/backend/ServeFlow.Infrastructure/obj/Debug/net10.0/ServeFlo.0B0AC0C3.Up2Date
+/Users/kevinbrinsly/ServerFlow/backend/ServeFlow.Infrastructure/obj/Debug/net10.0/ServeFlow.Infrastructure.dll
+/Users/kevinbrinsly/ServerFlow/backend/ServeFlow.Infrastructure/obj/Debug/net10.0/refint/ServeFlow.Infrastructure.dll
+/Users/kevinbrinsly/ServerFlow/backend/ServeFlow.Infrastructure/obj/Debug/net10.0/ServeFlow.Infrastructure.pdb
+/Users/kevinbrinsly/ServerFlow/backend/ServeFlow.Infrastructure/obj/Debug/net10.0/ref/ServeFlow.Infrastructure.dll

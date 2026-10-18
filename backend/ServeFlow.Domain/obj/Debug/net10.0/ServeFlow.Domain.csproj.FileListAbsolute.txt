@@ -1,0 +1,11 @@
+/Users/kevinbrinsly/ServerFlow/backend/ServeFlow.Domain/bin/Debug/net10.0/ServeFlow.Domain.deps.json
+/Users/kevinbrinsly/ServerFlow/backend/ServeFlow.Domain/bin/Debug/net10.0/ServeFlow.Domain.dll
+/Users/kevinbrinsly/ServerFlow/backend/ServeFlow.Domain/bin/Debug/net10.0/ServeFlow.Domain.pdb
+/Users/kevinbrinsly/ServerFlow/backend/ServeFlow.Domain/obj/Debug/net10.0/ServeFlow.Domain.GeneratedMSBuildEditorConfig.editorconfig
+/Users/kevinbrinsly/ServerFlow/backend/ServeFlow.Domain/obj/Debug/net10.0/ServeFlow.Domain.AssemblyInfoInputs.cache
+/Users/kevinbrinsly/ServerFlow/backend/ServeFlow.Domain/obj/Debug/net10.0/ServeFlow.Domain.AssemblyInfo.cs
+/Users/kevinbrinsly/ServerFlow/backend/ServeFlow.Domain/obj/Debug/net10.0/ServeFlow.Domain.csproj.CoreCompileInputs.cache
+/Users/kevinbrinsly/ServerFlow/backend/ServeFlow.Domain/obj/Debug/net10.0/ServeFlow.Domain.dll
+/Users/kevinbrinsly/ServerFlow/backend/ServeFlow.Domain/obj/Debug/net10.0/refint/ServeFlow.Domain.dll
+/Users/kevinbrinsly/ServerFlow/backend/ServeFlow.Domain/obj/Debug/net10.0/ServeFlow.Domain.pdb
+/Users/kevinbrinsly/ServerFlow/backend/ServeFlow.Domain/obj/Debug/net10.0/ref/ServeFlow.Domain.dll

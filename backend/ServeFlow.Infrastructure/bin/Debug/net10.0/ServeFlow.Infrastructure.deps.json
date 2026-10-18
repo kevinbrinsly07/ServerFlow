@@ -1,0 +1,56 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v10.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v10.0": {
+      "ServeFlow.Infrastructure/1.0.0": {
+        "dependencies": {
+          "ServeFlow.Application": "1.0.0",
+          "ServeFlow.Domain": "1.0.0"
+        },
+        "runtime": {
+          "ServeFlow.Infrastructure.dll": {}
+        }
+      },
+      "ServeFlow.Application/1.0.0": {
+        "dependencies": {
+          "ServeFlow.Domain": "1.0.0"
+        },
+        "runtime": {
+          "ServeFlow.Application.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "ServeFlow.Domain/1.0.0": {
+        "runtime": {
+          "ServeFlow.Domain.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "ServeFlow.Infrastructure/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "ServeFlow.Application/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "ServeFlow.Domain/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}
