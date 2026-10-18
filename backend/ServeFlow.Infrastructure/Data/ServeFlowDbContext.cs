@@ -14,6 +14,8 @@ public class ServeFlowDbContext : DbContext
 
     public DbSet<Product> Products => Set<Product>();
 
+    public DbSet<Category> Categories => Set<Category>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -33,6 +35,29 @@ public class ServeFlowDbContext : DbContext
                 .HasPrecision(12, 2);
 
             entity.Property(product => product.CreatedAtUtc)
+                .IsRequired();
+
+            entity.HasOne(product => product.Category)
+                .WithMany(category => category.Products)
+                .HasForeignKey(product => product.CategoryId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<Category>(entity =>
+        {
+            entity.HasKey(category => category.Id);
+
+            entity.Property(category => category.Name)
+                .HasMaxLength(100)
+                .IsRequired();
+
+            entity.HasIndex(category => category.Name)
+                .IsUnique();
+
+            entity.Property(category => category.Description)
+                .HasMaxLength(500);
+
+            entity.Property(category => category.CreatedAtUtc)
                 .IsRequired();
         });
     }

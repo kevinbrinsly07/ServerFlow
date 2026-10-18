@@ -1,4 +1,3 @@
-
 namespace ServeFlow.Domain.Entities;
 
 public class Product
@@ -14,4 +13,8 @@ public class Product
     public bool IsAvailable { get; set; } = true;
 
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+
+    public Guid? CategoryId { get; set; }
+
+    public Category? Category { get; set; }
 }
