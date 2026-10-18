@@ -168,6 +168,9 @@ export default function Home() {
 
   const [authChecked, setAuthChecked] = useState(false);
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const isAdmin = currentUser?.roles?.includes("Admin") ?? false;
+  const isStaff = currentUser?.roles?.includes("Staff") ?? false;
+  const canManageProducts = isAdmin || isStaff;
 
   useEffect(() => {
     const token = getToken();
@@ -627,7 +630,24 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            {currentUser && (
+              <div className="mr-2 text-right">
+                <p className="text-sm font-medium text-white">
+                  {currentUser.fullName}
+                </p>
+                <span
+                  className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
+                    isAdmin
+                      ? "bg-emerald-500/10 text-emerald-400"
+                      : "bg-sky-500/10 text-sky-400"
+                  }`}
+                >
+                  {isAdmin ? "Admin" : isStaff ? "Staff" : "No role assigned"}
+                </span>
+              </div>
+            )}
+
             <button
               type="button"
               onClick={logout}
@@ -966,16 +986,18 @@ export default function Home() {
                               Edit
                             </button>
 
-                            <button
-                              type="button"
-                              disabled={deletingId === product.id}
-                              onClick={() => void handleDelete(product)}
-                              className="rounded-lg border border-red-900/70 px-3 py-2 text-sm text-red-400 transition hover:bg-red-950 disabled:opacity-50"
-                            >
-                              {deletingId === product.id
-                                ? "Deleting..."
-                                : "Delete"}
-                            </button>
+                            {isAdmin && (
+                              <button
+                                type="button"
+                                disabled={deletingId === product.id}
+                                onClick={() => void handleDelete(product)}
+                                className="rounded-lg border border-red-900/70 px-3 py-2 text-sm text-red-400 transition hover:bg-red-950 disabled:opacity-50"
+                              >
+                                {deletingId === product.id
+                                  ? "Deleting..."
+                                  : "Delete"}
+                              </button>
+                            )}
                           </div>
                         </div>
                       </li>
@@ -1038,81 +1060,82 @@ export default function Home() {
           </div>
 
           <div className="grid items-start gap-6 lg:grid-cols-[0.8fr_1.2fr]">
-            <form
-              onSubmit={handleCategorySubmit}
-              className="space-y-4 rounded-xl border border-slate-800 bg-slate-950/50 p-4"
-            >
-              <h3 className="font-semibold">
-                {editingCategoryId ? "Edit category" : "Create category"}
-              </h3>
-
-              <div>
-                <label
-                  htmlFor="categoryName"
-                  className="mb-2 block text-sm font-medium text-slate-300"
-                >
-                  Category name
-                </label>
-
-                <input
-                  id="categoryName"
-                  required
-                  minLength={1}
-                  maxLength={100}
-                  value={categoryForm.name}
-                  onChange={(event) =>
-                    updateCategoryField("name", event.target.value)
-                  }
-                  placeholder="e.g. Burgers"
-                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 outline-none transition placeholder:text-slate-600 focus:border-emerald-400"
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="categoryDescription"
-                  className="mb-2 block text-sm font-medium text-slate-300"
-                >
-                  Description
-                </label>
-
-                <textarea
-                  id="categoryDescription"
-                  maxLength={500}
-                  rows={3}
-                  value={categoryForm.description}
-                  onChange={(event) =>
-                    updateCategoryField("description", event.target.value)
-                  }
-                  placeholder="Optional category description..."
-                  className="w-full resize-y rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 outline-none transition placeholder:text-slate-600 focus:border-emerald-400"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={savingCategory}
-                className="w-full rounded-lg bg-emerald-500 px-4 py-3 font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:opacity-50"
+            {isAdmin && (
+              <form
+                onSubmit={handleCategorySubmit}
+                className="space-y-4 rounded-xl border border-slate-800 bg-slate-950/50 p-4"
               >
-                {savingCategory
-                  ? "Saving..."
-                  : editingCategoryId
-                    ? "Save category"
-                    : "Create category"}
-              </button>
+                <h3 className="font-semibold">
+                  {editingCategoryId ? "Edit category" : "Create category"}
+                </h3>
 
-              {editingCategoryId && (
+                <div>
+                  <label
+                    htmlFor="categoryName"
+                    className="mb-2 block text-sm font-medium text-slate-300"
+                  >
+                    Category name
+                  </label>
+
+                  <input
+                    id="categoryName"
+                    required
+                    minLength={1}
+                    maxLength={100}
+                    value={categoryForm.name}
+                    onChange={(event) =>
+                      updateCategoryField("name", event.target.value)
+                    }
+                    placeholder="e.g. Burgers"
+                    className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 outline-none transition placeholder:text-slate-600 focus:border-emerald-400"
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="categoryDescription"
+                    className="mb-2 block text-sm font-medium text-slate-300"
+                  >
+                    Description
+                  </label>
+
+                  <textarea
+                    id="categoryDescription"
+                    maxLength={500}
+                    rows={3}
+                    value={categoryForm.description}
+                    onChange={(event) =>
+                      updateCategoryField("description", event.target.value)
+                    }
+                    placeholder="Optional category description..."
+                    className="w-full resize-y rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 outline-none transition placeholder:text-slate-600 focus:border-emerald-400"
+                  />
+                </div>
+
                 <button
-                  type="button"
-                  onClick={resetCategoryForm}
+                  type="submit"
                   disabled={savingCategory}
-                  className="w-full rounded-lg border border-slate-700 px-4 py-3 text-sm text-slate-300 transition hover:bg-slate-800 disabled:opacity-50"
+                  className="w-full rounded-lg bg-emerald-500 px-4 py-3 font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:opacity-50"
                 >
-                  Cancel editing
+                  {savingCategory
+                    ? "Saving..."
+                    : editingCategoryId
+                      ? "Save category"
+                      : "Create category"}
                 </button>
-              )}
-            </form>
 
+                {editingCategoryId && (
+                  <button
+                    type="button"
+                    onClick={resetCategoryForm}
+                    disabled={savingCategory}
+                    className="w-full rounded-lg border border-slate-700 px-4 py-3 text-sm text-slate-300 transition hover:bg-slate-800 disabled:opacity-50"
+                  >
+                    Cancel editing
+                  </button>
+                )}
+              </form>
+            )}
             <div>
               <div className="mb-3 flex items-center justify-between gap-3">
                 <h3 className="font-semibold">Your categories</h3>
