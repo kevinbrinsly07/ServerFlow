@@ -1,5 +1,8 @@
 using Microsoft.Extensions.Configuration;
 using System.Collections.Generic;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.TestHost;
+using ServeFlow.UnitTests.Authentication;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -46,6 +49,29 @@ public class ProductsApiFactory : WebApplicationFactory<Program>
             services.AddDbContext<ServeFlowDbContext>(options =>
                 options.UseInMemoryDatabase(_databaseName));
         });
+
+        builder.ConfigureTestServices(services =>
+        {
+            services
+            .AddAuthentication(options =>
+            {
+                options.DefaultAuthenticateScheme =
+                    TestAuthHandler.SchemeName;
+
+                options.DefaultChallengeScheme =
+                    TestAuthHandler.SchemeName;
+
+                options.DefaultScheme =
+                    TestAuthHandler.SchemeName;
+            })
+            .AddScheme<
+                AuthenticationSchemeOptions,
+                TestAuthHandler>(
+                    TestAuthHandler.SchemeName,
+                    _ => { });
+        });
+
+
     }
 }
 

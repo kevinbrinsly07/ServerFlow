@@ -1,4 +1,5 @@
 
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ServeFlow.Api.Contracts.Products;
@@ -19,6 +20,7 @@ public class ProductsController : ControllerBase
     }
 
     // GET: api/products
+    // Public: anyone can view products.
     [HttpGet]
     public async Task<IActionResult> GetProducts(
         [FromQuery] string? search,
@@ -64,6 +66,7 @@ public class ProductsController : ControllerBase
     }
 
     // GET: api/products/{id}
+    // Public: anyone can view a product.
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<Product>> GetProduct(Guid id)
     {
@@ -81,6 +84,8 @@ public class ProductsController : ControllerBase
     }
 
     // POST: api/products
+    // Staff and Admin can create products.
+    [Authorize(Roles = "Staff,Admin")]
     [HttpPost]
     public async Task<ActionResult<Product>> CreateProduct(
         CreateProductRequest request)
@@ -147,6 +152,8 @@ public class ProductsController : ControllerBase
     }
 
     // PUT: api/products/{id}
+    // Staff and Admin can update products.
+    [Authorize(Roles = "Staff,Admin")]
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<Product>> UpdateProduct(
         Guid id,
@@ -217,6 +224,8 @@ public class ProductsController : ControllerBase
     }
 
     // DELETE: api/products/{id}
+    // Only Admin can delete products.
+    [Authorize(Roles = "Admin")]
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> DeleteProduct(Guid id)
     {
