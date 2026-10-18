@@ -47,27 +47,17 @@ public class ProductsController : ControllerBase
     public async Task<ActionResult<Product>> CreateProduct(
         CreateProductRequest request)
     {
-        var name = request.Name.Trim();
+        var validationError = ValidateProduct(
+            request.Name, request.Price);
 
-        if (string.IsNullOrWhiteSpace(name))
+        if (validationError is not null)
         {
-            return BadRequest(new
-            {
-                message = "Product name is required."
-            });
-        }
-
-        if (request.Price <= 0)
-        {
-            return BadRequest(new
-            {
-                message = "Price must be greater than zero."
-            });
+            return BadRequest(new { message = validationError });
         }
 
         var product = new Product
         {
-            Name = name,
+            Name = request.Name.Trim(),
             Description = request.Description?.Trim() ?? string.Empty,
             Price = request.Price
         };
@@ -80,10 +70,85 @@ public class ProductsController : ControllerBase
             new { id = product.Id },
             product);
     }
+
+    [HttpPut("{id:guid}")]
+    public async Task<ActionResult<Product>> UpdateProduct(
+        Guid id,
+        UpdateProductRequest request)
+    {
+        var product = await _dbContext.Products
+            .FirstOrDefaultAsync(product => product.Id == id);
+
+        if (product is null)
+        {
+            return NotFound(new { message = "Product not found." });
+        }
+
+        var validationError = ValidateProduct(
+            request.Name, request.Price);
+
+        if (validationError is not null)
+        {
+            return BadRequest(new { message = validationError });
+        }
+
+        product.Name = request.Name.Trim();
+        product.Description = request.Description?.Trim() ?? string.Empty;
+        product.Price = request.Price;
+        product.IsAvailable = request.IsAvailable;
+
+        await _dbContext.SaveChangesAsync();
+
+        return Ok(product);
+    }
+
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> DeleteProduct(Guid id)
+    {
+        var product = await _dbContext.Products
+            .FirstOrDefaultAsync(product => product.Id == id);
+
+        if (product is null)
+        {
+            return NotFound(new { message = "Product not found." });
+        }
+
+        _dbContext.Products.Remove(product);
+        await _dbContext.SaveChangesAsync();
+
+        return NoContent();
+    }
+
+    private static string? ValidateProduct(string? name, decimal price)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return "Product name is required.";
+        }
+
+        if (name.Trim().Length > 150)
+        {
+            return "Product name cannot exceed 150 characters.";
+        }
+
+        if (price <= 0)
+        {
+            return "Price must be greater than zero.";
+        }
+
+        return null;
+    }
 }
 
 public record CreateProductRequest(
     string Name,
     decimal Price,
     string? Description
+);
+
+public record UpdateProductRequest(
+    string Name,
+    decimal Price,
+    string? Description,
+    bool IsAvailable
 );
