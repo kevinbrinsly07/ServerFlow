@@ -1,7 +1,6 @@
-
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 
 type Product = {
   id: string;
@@ -9,33 +8,62 @@ type Product = {
   description: string;
   price: number;
   isAvailable: boolean;
+  createdAtUtc?: string;
+};
+
+type ProductForm = {
+  name: string;
+  price: string;
+  description: string;
+  isAvailable: boolean;
 };
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5080";
 
+const emptyForm: ProductForm = {
+  name: "",
+  price: "",
+  description: "",
+  isAvailable: true,
+};
+
+function formatPrice(price: number) {
+  return `LKR ${price.toLocaleString("en-LK", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
 export default function Home() {
   const [products, setProducts] = useState<Product[]>([]);
-  const [name, setName] = useState("");
-  const [price, setPrice] = useState("");
-  const [description, setDescription] = useState("");
+  const [form, setForm] = useState<ProductForm>(emptyForm);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
-  async function loadProducts() {
+  const loadProducts = useCallback(async () => {
     setLoading(true);
     setError("");
 
     try {
-      const response = await fetch(`${API_URL}/api/products`);
+      const response = await fetch(`${API_URL}/api/products`, {
+        cache: "no-store",
+      });
 
       if (!response.ok) {
         throw new Error("Could not load products.");
       }
 
       const data: Product[] = await response.json();
-      setProducts(data);
+
+      setProducts(
+        data.sort((a, b) => a.name.localeCompare(b.name))
+      );
     } catch {
       setError(
         "Unable to connect to ServeFlow. Check that the API and database are running."
@@ -43,50 +71,113 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
     void loadProducts();
-  }, []);
+  }, [loadProducts]);
+
+  function updateField<K extends keyof ProductForm>(
+    field: K,
+    value: ProductForm[K]
+  ) {
+    setForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  }
+
+  function resetForm() {
+    setForm(emptyForm);
+    setEditingId(null);
+  }
+
+  function startEditing(product: Product) {
+    setEditingId(product.id);
+
+    setForm({
+      name: product.name,
+      price: String(product.price),
+      description: product.description ?? "",
+      isAvailable: product.isAvailable,
+    });
+
+    setError("");
+    setSuccess("");
+
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
     setSaving(true);
     setError("");
+    setSuccess("");
 
     try {
-      const response = await fetch(`${API_URL}/api/products`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name,
-          price: Number(price),
-          description,
-        }),
-      });
+      const isEditing = editingId !== null;
 
-      if (!response.ok) {
-        const message = await response.text();
-        throw new Error(message || "Could not create product.");
-      }
-
-      const created: Product = await response.json();
-
-      setProducts((current) =>
-        [...current, created].sort((a, b) =>
-          a.name.localeCompare(b.name)
-        )
+      const response = await fetch(
+        isEditing
+          ? `${API_URL}/api/products/${editingId}`
+          : `${API_URL}/api/products`,
+        {
+          method: isEditing ? "PUT" : "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: form.name.trim(),
+            price: Number(form.price),
+            description: form.description.trim(),
+            ...(isEditing && {
+              isAvailable: form.isAvailable,
+            }),
+          }),
+        }
       );
 
-      setName("");
-      setPrice("");
-      setDescription("");
-    } catch (error) {
+      if (!response.ok) {
+        let message = `Request failed (${response.status}).`;
+
+        try {
+          const body = await response.json();
+          message = body.message ?? body.title ?? message;
+        } catch {
+          // Keep the fallback message if the response isn't JSON.
+        }
+
+        throw new Error(message);
+      }
+
+      const savedProduct: Product = await response.json();
+
+      setProducts((current) => {
+        const updated = isEditing
+          ? current.map((product) =>
+              product.id === savedProduct.id
+                ? savedProduct
+                : product
+            )
+          : [...current, savedProduct];
+
+        return updated.sort((a, b) =>
+          a.name.localeCompare(b.name)
+        );
+      });
+
+      setSuccess(
+        isEditing
+          ? "Product updated successfully."
+          : "Product added successfully."
+      );
+
+      resetForm();
+    } catch (err) {
       setError(
-        error instanceof Error
-          ? error.message
+        err instanceof Error
+          ? err.message
           : "Something went wrong."
       );
     } finally {
@@ -94,137 +185,464 @@ export default function Home() {
     }
   }
 
+  async function handleDelete(product: Product) {
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${product.name}"?`
+    );
+
+    if (!confirmed) return;
+
+    setDeletingId(product.id);
+    setError("");
+    setSuccess("");
+
+    try {
+      const response = await fetch(
+        `${API_URL}/api/products/${product.id}`,
+        { method: "DELETE" }
+      );
+
+      if (!response.ok) {
+        let message = `Could not delete product (${response.status}).`;
+
+        try {
+          const body = await response.json();
+          message = body.message ?? body.title ?? message;
+        } catch {
+          // Use the fallback message.
+        }
+
+        throw new Error(message);
+      }
+
+      setProducts((current) =>
+        current.filter((item) => item.id !== product.id)
+      );
+
+      if (editingId === product.id) {
+        resetForm();
+      }
+
+      setSuccess("Product deleted successfully.");
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Could not delete product."
+      );
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  async function toggleAvailability(product: Product) {
+    setError("");
+    setSuccess("");
+
+    try {
+      const response = await fetch(
+        `${API_URL}/api/products/${product.id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: product.name,
+            price: product.price,
+            description: product.description,
+            isAvailable: !product.isAvailable,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Could not update product availability.");
+      }
+
+      const updatedProduct: Product = await response.json();
+
+      setProducts((current) =>
+        current.map((item) =>
+          item.id === updatedProduct.id ? updatedProduct : item
+        )
+      );
+
+      setSuccess("Product availability updated.");
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Something went wrong."
+      );
+    }
+  }
+
+  const filteredProducts = products.filter((product) => {
+    const query = search.trim().toLowerCase();
+
+    return (
+      product.name.toLowerCase().includes(query) ||
+      product.description.toLowerCase().includes(query)
+    );
+  });
+
+  const availableCount = products.filter(
+    (product) => product.isAvailable
+  ).length;
+
+  const listedValue = products.reduce(
+    (total, product) => total + product.price,
+    0
+  );
+
   return (
-    <main className="min-h-screen bg-slate-950 px-6 py-10 text-white">
-      <div className="mx-auto max-w-5xl">
-        <header className="mb-10">
-          <p className="text-sm font-semibold uppercase tracking-[0.25em] text-emerald-400">
-            Restaurant management
-          </p>
-          <h1 className="mt-3 text-4xl font-bold tracking-tight">
-            ServeFlow
-          </h1>
-          <p className="mt-2 text-slate-400">
-            Manage your restaurant menu in one place.
-          </p>
+    <main className="min-h-screen bg-slate-950 px-4 py-8 text-white sm:px-6 lg:px-10">
+      <div className="mx-auto max-w-7xl">
+        <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.25em] text-emerald-400">
+              Restaurant management
+            </p>
+
+            <h1 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
+              ServeFlow
+            </h1>
+
+            <p className="mt-2 text-slate-400">
+              Manage your restaurant menu in one place.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => void loadProducts()}
+            disabled={loading}
+            className="rounded-lg border border-slate-700 px-4 py-2.5 text-sm font-medium transition hover:border-emerald-400 hover:text-emerald-400 disabled:opacity-50"
+          >
+            {loading ? "Refreshing..." : "↻ Refresh"}
+          </button>
         </header>
 
-        <div className="grid gap-8 md:grid-cols-[1fr_1.2fr]">
-          <section className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
-            <h2 className="mb-5 text-xl font-semibold">
-              Add a menu item
-            </h2>
+        {error && (
+          <div
+            role="alert"
+            className="mb-5 rounded-xl border border-red-900 bg-red-950/60 p-4 text-sm text-red-300"
+          >
+            {error}
+          </div>
+        )}
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+        {success && (
+          <div
+            role="status"
+            className="mb-5 rounded-xl border border-emerald-900 bg-emerald-950/50 p-4 text-sm text-emerald-300"
+          >
+            {success}
+          </div>
+        )}
+
+        <section className="mb-8 grid gap-4 sm:grid-cols-3">
+          <StatCard
+            label="Total products"
+            value={String(products.length)}
+            detail="All menu items"
+          />
+
+          <StatCard
+            label="Available"
+            value={String(availableCount)}
+            detail="Currently available"
+          />
+
+          <StatCard
+            label="Combined listed prices"
+            value={formatPrice(listedValue)}
+            detail="Sum of each product's price"
+          />
+        </section>
+
+        <div className="grid items-start gap-6 lg:grid-cols-[0.85fr_1.5fr]">
+          <section className="rounded-2xl border border-slate-800 bg-slate-900 p-5 sm:p-6">
+            <div className="mb-6">
+              <p className="text-xs font-semibold uppercase tracking-widest text-emerald-400">
+                Product management
+              </p>
+
+              <h2 className="mt-2 text-xl font-semibold">
+                {editingId ? "Edit product" : "Add a menu item"}
+              </h2>
+
+              <p className="mt-1 text-sm text-slate-400">
+                {editingId
+                  ? "Update the selected product's details."
+                  : "Create a new product for your menu."}
+              </p>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-5">
               <div>
-                <label htmlFor="name" className="mb-2 block text-sm text-slate-300">
+                <label
+                  htmlFor="name"
+                  className="mb-2 block text-sm font-medium text-slate-300"
+                >
                   Product name
                 </label>
+
                 <input
                   id="name"
                   required
                   maxLength={150}
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
+                  value={form.name}
+                  onChange={(event) =>
+                    updateField("name", event.target.value)
+                  }
                   placeholder="Chicken Burger"
-                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 outline-none focus:border-emerald-400"
+                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 outline-none transition placeholder:text-slate-600 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400"
                 />
               </div>
 
               <div>
-                <label htmlFor="price" className="mb-2 block text-sm text-slate-300">
+                <label
+                  htmlFor="price"
+                  className="mb-2 block text-sm font-medium text-slate-300"
+                >
                   Price (LKR)
                 </label>
+
                 <input
                   id="price"
                   required
                   type="number"
                   min="0.01"
                   step="0.01"
-                  value={price}
-                  onChange={(event) => setPrice(event.target.value)}
+                  value={form.price}
+                  onChange={(event) =>
+                    updateField("price", event.target.value)
+                  }
                   placeholder="1250.00"
-                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 outline-none focus:border-emerald-400"
+                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 outline-none transition placeholder:text-slate-600 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400"
                 />
               </div>
 
               <div>
-                <label htmlFor="description" className="mb-2 block text-sm text-slate-300">
+                <label
+                  htmlFor="description"
+                  className="mb-2 block text-sm font-medium text-slate-300"
+                >
                   Description
                 </label>
+
                 <textarea
                   id="description"
                   maxLength={1000}
-                  value={description}
-                  onChange={(event) => setDescription(event.target.value)}
+                  rows={4}
+                  value={form.description}
+                  onChange={(event) =>
+                    updateField("description", event.target.value)
+                  }
                   placeholder="Describe the menu item..."
-                  className="min-h-24 w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 outline-none focus:border-emerald-400"
+                  className="w-full resize-y rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 outline-none transition placeholder:text-slate-600 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400"
                 />
               </div>
+
+              {editingId && (
+                <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-800 bg-slate-950 p-3">
+                  <input
+                    type="checkbox"
+                    checked={form.isAvailable}
+                    onChange={(event) =>
+                      updateField("isAvailable", event.target.checked)
+                    }
+                    className="h-4 w-4 accent-emerald-400"
+                  />
+
+                  <span className="text-sm text-slate-300">
+                    Product is available
+                  </span>
+                </label>
+              )}
 
               <button
                 type="submit"
                 disabled={saving}
-                className="w-full rounded-lg bg-emerald-500 px-4 py-3 font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:opacity-50"
+                className="w-full rounded-lg bg-emerald-500 px-4 py-3 font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {saving ? "Saving..." : "Add product"}
+                {saving
+                  ? "Saving..."
+                  : editingId
+                    ? "Save changes"
+                    : "Add product"}
               </button>
+
+              {editingId && (
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  disabled={saving}
+                  className="w-full rounded-lg border border-slate-700 px-4 py-3 font-medium text-slate-300 transition hover:bg-slate-800 disabled:opacity-50"
+                >
+                  Cancel editing
+                </button>
+              )}
             </form>
           </section>
 
-          <section className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
-            <div className="mb-5 flex items-center justify-between gap-3">
-              <h2 className="text-xl font-semibold">Menu items</h2>
-              <span className="rounded-full bg-slate-800 px-3 py-1 text-sm text-slate-300">
-                {products.length} products
+          <section className="min-w-0 rounded-2xl border border-slate-800 bg-slate-900 p-5 sm:p-6">
+            <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-xl font-semibold">Menu items</h2>
+
+                <p className="mt-1 text-sm text-slate-400">
+                  Search, edit, or manage your products.
+                </p>
+              </div>
+
+              <span className="w-fit rounded-full bg-slate-800 px-3 py-1 text-sm text-slate-300">
+                {filteredProducts.length}{" "}
+                {filteredProducts.length === 1 ? "product" : "products"}
               </span>
             </div>
 
-            {error && (
-              <p role="alert" className="mb-4 rounded-lg bg-red-950 p-3 text-sm text-red-300">
-                {error}
-              </p>
-            )}
+            <div className="mb-5">
+              <label htmlFor="search" className="sr-only">
+                Search products
+              </label>
+
+              <input
+                id="search"
+                type="search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search products..."
+                className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 outline-none placeholder:text-slate-600 focus:border-emerald-400"
+              />
+            </div>
 
             {loading ? (
-              <p className="text-slate-400">Loading products...</p>
-            ) : products.length === 0 ? (
-              <p className="text-slate-400">
-                No menu items yet. Add your first product.
-              </p>
+              <div className="space-y-3">
+                {[1, 2, 3].map((item) => (
+                  <div
+                    key={item}
+                    className="h-20 animate-pulse rounded-lg bg-slate-800"
+                  />
+                ))}
+
+                <p className="text-sm text-slate-400">
+                  Loading products...
+                </p>
+              </div>
+            ) : filteredProducts.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-700 px-4 py-12 text-center">
+                <p className="font-medium text-slate-300">
+                  {search
+                    ? "No matching products found."
+                    : "No menu items yet."}
+                </p>
+
+                <p className="mt-2 text-sm text-slate-500">
+                  {search
+                    ? "Try a different search term."
+                    : "Add your first product using the form."}
+                </p>
+              </div>
             ) : (
               <ul className="divide-y divide-slate-800">
-                {products.map((product) => (
-                  <li
-                    key={product.id}
-                    className="flex items-start justify-between gap-4 py-4"
-                  >
-                    <div>
-                      <h3 className="font-medium">{product.name}</h3>
-                      <p className="mt-1 text-sm text-slate-400">
-                        {product.description || "No description"}
-                      </p>
+                {filteredProducts.map((product) => (
+                  <li key={product.id} className="py-5">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="break-words font-semibold text-white">
+                            {product.name}
+                          </h3>
+
+                          <span
+                            className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                              product.isAvailable
+                                ? "bg-emerald-950 text-emerald-400"
+                                : "bg-slate-800 text-slate-400"
+                            }`}
+                          >
+                            {product.isAvailable
+                              ? "Available"
+                              : "Unavailable"}
+                          </span>
+                        </div>
+
+                        <p className="mt-2 whitespace-pre-wrap break-words text-sm text-slate-400">
+                          {product.description || "No description"}
+                        </p>
+
+                        <p className="mt-3 font-semibold text-emerald-400">
+                          {formatPrice(product.price)}
+                        </p>
+                      </div>
+
+                      <div className="flex shrink-0 flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void toggleAvailability(product)}
+                          className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 transition hover:border-emerald-400 hover:text-emerald-400"
+                        >
+                          {product.isAvailable
+                            ? "Disable"
+                            : "Enable"}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => startEditing(product)}
+                          className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 transition hover:border-sky-400 hover:text-sky-400"
+                        >
+                          Edit
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={deletingId === product.id}
+                          onClick={() => void handleDelete(product)}
+                          className="rounded-lg border border-red-900/70 px-3 py-2 text-sm text-red-400 transition hover:bg-red-950 disabled:opacity-50"
+                        >
+                          {deletingId === product.id
+                            ? "Deleting..."
+                            : "Delete"}
+                        </button>
+                      </div>
                     </div>
-                    <span className="whitespace-nowrap font-semibold text-emerald-400">
-                      LKR {product.price.toLocaleString("en-LK", {
-                        minimumFractionDigits: 2,
-                      })}
-                    </span>
                   </li>
                 ))}
               </ul>
             )}
-
-            <button
-              type="button"
-              onClick={() => void loadProducts()}
-              className="mt-5 text-sm text-emerald-400 hover:text-emerald-300"
-            >
-              Refresh products
-            </button>
           </section>
         </div>
+
+        <footer className="mt-10 border-t border-slate-800 pt-5 text-center text-xs text-slate-500">
+          ServeFlow · Restaurant management system
+        </footer>
       </div>
     </main>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
+      <p className="text-sm text-slate-400">{label}</p>
+
+      <p className="mt-3 break-words text-2xl font-bold tracking-tight sm:text-3xl">
+        {value}
+      </p>
+
+      <p className="mt-2 text-xs text-slate-500">{detail}</p>
+    </div>
   );
 }
