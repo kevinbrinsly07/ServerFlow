@@ -1,10 +1,12 @@
-
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using ServeFlow.Domain.Entities;
+using ServeFlow.Infrastructure.Identity;
 
 namespace ServeFlow.Infrastructure.Data;
 
-public class ServeFlowDbContext : DbContext
+public class ServeFlowDbContext
+    : IdentityDbContext<ApplicationUser>
 {
     public ServeFlowDbContext(
         DbContextOptions<ServeFlowDbContext> options)
@@ -16,7 +18,8 @@ public class ServeFlowDbContext : DbContext
 
     public DbSet<Category> Categories => Set<Category>();
 
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    protected override void OnModelCreating(
+        ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
@@ -58,6 +61,13 @@ public class ServeFlowDbContext : DbContext
                 .HasMaxLength(500);
 
             entity.Property(category => category.CreatedAtUtc)
+                .IsRequired();
+        });
+
+        modelBuilder.Entity<ApplicationUser>(entity =>
+        {
+            entity.Property(user => user.FullName)
+                .HasMaxLength(150)
                 .IsRequired();
         });
     }

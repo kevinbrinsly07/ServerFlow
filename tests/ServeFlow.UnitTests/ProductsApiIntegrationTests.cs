@@ -1,4 +1,5 @@
-
+using Microsoft.Extensions.Configuration;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -14,12 +15,26 @@ using Xunit;
 
 namespace ServeFlow.UnitTests;
 
+
 public class ProductsApiFactory : WebApplicationFactory<Program>
 {
     private readonly string _databaseName = Guid.NewGuid().ToString();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        builder.ConfigureAppConfiguration((context, configuration) =>
+        {
+            configuration.AddInMemoryCollection(
+                new Dictionary<string, string?>
+                {
+                    ["Jwt:Key"] =
+                        "ServeFlow_Test_Only_Signing_Key_2026_0123456789",
+
+                    ["Jwt:Issuer"] = "ServeFlow.Tests",
+                    ["Jwt:Audience"] = "ServeFlow.Tests.Client"
+                });
+        });
+
         builder.ConfigureServices(services =>
         {
             services.RemoveAll<
@@ -33,6 +48,7 @@ public class ProductsApiFactory : WebApplicationFactory<Program>
         });
     }
 }
+
 
 public class ProductsApiIntegrationTests : IAsyncLifetime
 {
