@@ -8,6 +8,7 @@
 /Users/kevinbrinsly/ServerFlow/backend/ServeFlow.Application/obj/Debug/net10.0/ServeFlow.Application.AssemblyInfoInputs.cache
 /Users/kevinbrinsly/ServerFlow/backend/ServeFlow.Application/obj/Debug/net10.0/ServeFlow.Application.AssemblyInfo.cs
 /Users/kevinbrinsly/ServerFlow/backend/ServeFlow.Application/obj/Debug/net10.0/ServeFlow.Application.csproj.CoreCompileInputs.cache
+/Users/kevinbrinsly/ServerFlow/backend/ServeFlow.Application/obj/Debug/net10.0/ServeFlow.Application.sourcelink.json
 /Users/kevinbrinsly/ServerFlow/backend/ServeFlow.Application/obj/Debug/net10.0/ServeFlo.3F1A342F.Up2Date
 /Users/kevinbrinsly/ServerFlow/backend/ServeFlow.Application/obj/Debug/net10.0/ServeFlow.Application.dll
 /Users/kevinbrinsly/ServerFlow/backend/ServeFlow.Application/obj/Debug/net10.0/refint/ServeFlow.Application.dll
