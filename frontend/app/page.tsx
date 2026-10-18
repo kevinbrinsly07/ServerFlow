@@ -555,9 +555,12 @@ export default function Home() {
     setSuccess("");
 
     try {
-      const response = await apiFetch(`${API_URL}/api/categories/${category.id}`, {
-        method: "DELETE",
-      });
+      const response = await apiFetch(
+        `${API_URL}/api/categories/${category.id}`,
+        {
+          method: "DELETE",
+        },
+      );
 
       if (!response.ok) {
         throw new Error(
@@ -624,14 +627,24 @@ export default function Home() {
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={refreshData}
-            disabled={loading || categoriesLoading}
-            className="rounded-lg border border-slate-700 px-4 py-2.5 text-sm font-medium transition hover:border-emerald-400 hover:text-emerald-400 disabled:opacity-50"
-          >
-            {loading || categoriesLoading ? "Refreshing..." : "↻ Refresh"}
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={logout}
+              className="rounded-lg border border-red-900 px-4 py-2.5 text-sm font-medium text-red-400 transition hover:bg-red-950"
+            >
+              Sign out
+            </button>
+
+            <button
+              type="button"
+              onClick={refreshData}
+              disabled={loading || categoriesLoading}
+              className="rounded-lg border border-slate-700 px-4 py-2.5 text-sm font-medium transition hover:border-emerald-400 hover:text-emerald-400 disabled:opacity-50"
+            >
+              {loading || categoriesLoading ? "Refreshing..." : "↻ Refresh"}
+            </button>
+          </div>
         </header>
 
         {error && (
