@@ -1,12 +1,15 @@
-
 "use client";
+import { useRouter } from "next/navigation";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 
 import {
-  FormEvent,
-  useCallback,
-  useEffect,
-  useState,
-} from "react";
+  API_URL,
+  apiFetch,
+  getToken,
+  getUser,
+  logout,
+  type AuthUser,
+} from "@/lib/auth";
 
 type Category = {
   id: string;
@@ -48,9 +51,6 @@ type ProductsResponse = {
   totalPages: number;
 };
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5080";
-
 const PAGE_SIZE = 5;
 const STATS_PAGE_SIZE = 100;
 
@@ -76,7 +76,7 @@ function formatPrice(price: number) {
 
 async function readError(
   response: Response,
-  fallback: string
+  fallback: string,
 ): Promise<string> {
   try {
     const body = await response.json();
@@ -89,7 +89,7 @@ async function readError(
 async function fetchProducts(
   page: number,
   pageSize: number,
-  search = ""
+  search = "",
 ): Promise<ProductsResponse> {
   const params = new URLSearchParams({
     page: String(page),
@@ -100,14 +100,14 @@ async function fetchProducts(
     params.set("search", search.trim());
   }
 
-  const response = await fetch(
+  const response = await apiFetch(
     `${API_URL}/api/products?${params.toString()}`,
-    { cache: "no-store" }
+    { cache: "no-store" },
   );
 
   if (!response.ok) {
     throw new Error(
-      `Could not load products. API returned ${response.status}.`
+      `Could not load products. API returned ${response.status}.`,
     );
   }
 
@@ -120,7 +120,7 @@ async function fetchProducts(
     !Array.isArray(data.items)
   ) {
     throw new Error(
-      "Unexpected API response. Expected a paginated products response."
+      "Unexpected API response. Expected a paginated products response.",
     );
   }
 
@@ -129,12 +129,9 @@ async function fetchProducts(
 
   return {
     items,
-    page:
-      typeof payload.page === "number" ? payload.page : page,
+    page: typeof payload.page === "number" ? payload.page : page,
     pageSize:
-      typeof payload.pageSize === "number"
-        ? payload.pageSize
-        : pageSize,
+      typeof payload.pageSize === "number" ? payload.pageSize : pageSize,
     totalCount:
       typeof payload.totalCount === "number"
         ? payload.totalCount
@@ -147,13 +144,13 @@ async function fetchProducts(
 }
 
 async function fetchCategories(): Promise<Category[]> {
-  const response = await fetch(`${API_URL}/api/categories`, {
+  const response = await apiFetch(`${API_URL}/api/categories`, {
     cache: "no-store",
   });
 
   if (!response.ok) {
     throw new Error(
-      `Could not load categories. API returned ${response.status}.`
+      `Could not load categories. API returned ${response.status}.`,
     );
   }
 
@@ -167,6 +164,24 @@ async function fetchCategories(): Promise<Category[]> {
 }
 
 export default function Home() {
+  const router = useRouter();
+
+  const [authChecked, setAuthChecked] = useState(false);
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+
+  useEffect(() => {
+    const token = getToken();
+    const user = getUser();
+
+    if (!token || !user) {
+      router.replace("/login");
+      return;
+    }
+
+    setCurrentUser(user);
+    setAuthChecked(true);
+  }, [router]);
+
   const [products, setProducts] = useState<Product[]>([]);
   const [statsProducts, setStatsProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -179,8 +194,9 @@ export default function Home() {
     useState<CategoryForm>(emptyCategoryForm);
 
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingCategoryId, setEditingCategoryId] =
-    useState<string | null>(null);
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(
+    null,
+  );
 
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -192,8 +208,9 @@ export default function Home() {
   const [saving, setSaving] = useState(false);
   const [savingCategory, setSavingCategory] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [deletingCategoryId, setDeletingCategoryId] =
-    useState<string | null>(null);
+  const [deletingCategoryId, setDeletingCategoryId] = useState<string | null>(
+    null,
+  );
 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -211,11 +228,7 @@ export default function Home() {
     setError("");
 
     try {
-      const data = await fetchProducts(
-        page,
-        PAGE_SIZE,
-        debouncedSearch
-      );
+      const data = await fetchProducts(page, PAGE_SIZE, debouncedSearch);
 
       const lastValidPage = Math.max(data.totalPages, 1);
 
@@ -228,11 +241,7 @@ export default function Home() {
       setTotalCount(data.totalCount);
       setTotalPages(data.totalPages);
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Unable to load products."
-      );
+      setError(err instanceof Error ? err.message : "Unable to load products.");
     } finally {
       setLoading(false);
     }
@@ -253,11 +262,9 @@ export default function Home() {
 
       if (firstPage.totalPages > 1) {
         const remainingPages = await Promise.all(
-          Array.from(
-            { length: firstPage.totalPages - 1 },
-            (_, index) =>
-              fetchProducts(index + 2, STATS_PAGE_SIZE)
-          )
+          Array.from({ length: firstPage.totalPages - 1 }, (_, index) =>
+            fetchProducts(index + 2, STATS_PAGE_SIZE),
+          ),
         );
 
         for (const result of remainingPages) {
@@ -287,9 +294,7 @@ export default function Home() {
       setCategories(data);
     } catch (err) {
       setError(
-        err instanceof Error
-          ? err.message
-          : "Unable to load categories."
+        err instanceof Error ? err.message : "Unable to load categories.",
       );
     } finally {
       setCategoriesLoading(false);
@@ -310,7 +315,7 @@ export default function Home() {
 
   function updateField<K extends keyof ProductForm>(
     field: K,
-    value: ProductForm[K]
+    value: ProductForm[K],
   ) {
     setForm((current) => ({
       ...current,
@@ -331,8 +336,7 @@ export default function Home() {
       price: String(product.price),
       description: product.description ?? "",
       isAvailable: product.isAvailable,
-      categoryId:
-        product.categoryId ?? product.category?.id ?? "",
+      categoryId: product.categoryId ?? product.category?.id ?? "",
     });
 
     setError("");
@@ -351,7 +355,7 @@ export default function Home() {
     try {
       const isEditing = editingId !== null;
 
-      const response = await fetch(
+      const response = await apiFetch(
         isEditing
           ? `${API_URL}/api/products/${editingId}`
           : `${API_URL}/api/products`,
@@ -369,44 +373,33 @@ export default function Home() {
               isAvailable: form.isAvailable,
             }),
           }),
-        }
+        },
       );
 
       if (!response.ok) {
         throw new Error(
-          await readError(
-            response,
-            `Request failed (${response.status}).`
-          )
+          await readError(response, `Request failed (${response.status}).`),
         );
       }
 
       setSuccess(
         isEditing
           ? "Product updated successfully."
-          : "Product added successfully."
+          : "Product added successfully.",
       );
 
       resetForm();
       setPage(1);
       refreshData();
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Something went wrong."
-      );
+      setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
       setSaving(false);
     }
   }
 
   async function handleDelete(product: Product) {
-    if (
-      !window.confirm(
-        `Are you sure you want to delete "${product.name}"?`
-      )
-    ) {
+    if (!window.confirm(`Are you sure you want to delete "${product.name}"?`)) {
       return;
     }
 
@@ -415,17 +408,16 @@ export default function Home() {
     setSuccess("");
 
     try {
-      const response = await fetch(
-        `${API_URL}/api/products/${product.id}`,
-        { method: "DELETE" }
-      );
+      const response = await apiFetch(`${API_URL}/api/products/${product.id}`, {
+        method: "DELETE",
+      });
 
       if (!response.ok) {
         throw new Error(
           await readError(
             response,
-            `Could not delete product (${response.status}).`
-          )
+            `Could not delete product (${response.status}).`,
+          ),
         );
       }
 
@@ -437,9 +429,7 @@ export default function Home() {
       refreshData();
     } catch (err) {
       setError(
-        err instanceof Error
-          ? err.message
-          : "Could not delete product."
+        err instanceof Error ? err.message : "Could not delete product.",
       );
     } finally {
       setDeletingId(null);
@@ -451,47 +441,36 @@ export default function Home() {
     setSuccess("");
 
     try {
-      const response = await fetch(
-        `${API_URL}/api/products/${product.id}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            name: product.name,
-            price: product.price,
-            description: product.description ?? "",
-            isAvailable: !product.isAvailable,
-            categoryId:
-              product.categoryId ?? product.category?.id ?? null,
-          }),
-        }
-      );
+      const response = await apiFetch(`${API_URL}/api/products/${product.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: product.name,
+          price: product.price,
+          description: product.description ?? "",
+          isAvailable: !product.isAvailable,
+          categoryId: product.categoryId ?? product.category?.id ?? null,
+        }),
+      });
 
       if (!response.ok) {
         throw new Error(
-          await readError(
-            response,
-            "Could not update product availability."
-          )
+          await readError(response, "Could not update product availability."),
         );
       }
 
       setSuccess("Product availability updated.");
       refreshData();
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Something went wrong."
-      );
+      setError(err instanceof Error ? err.message : "Something went wrong.");
     }
   }
 
   function updateCategoryField<K extends keyof CategoryForm>(
     field: K,
-    value: CategoryForm[K]
+    value: CategoryForm[K],
   ) {
     setCategoryForm((current) => ({
       ...current,
@@ -514,9 +493,7 @@ export default function Home() {
     setSuccess("");
   }
 
-  async function handleCategorySubmit(
-    event: FormEvent<HTMLFormElement>
-  ) {
+  async function handleCategorySubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     setSavingCategory(true);
@@ -526,7 +503,7 @@ export default function Home() {
     try {
       const isEditing = editingCategoryId !== null;
 
-      const response = await fetch(
+      const response = await apiFetch(
         isEditing
           ? `${API_URL}/api/categories/${editingCategoryId}`
           : `${API_URL}/api/categories`,
@@ -539,32 +516,28 @@ export default function Home() {
             name: categoryForm.name.trim(),
             description: categoryForm.description.trim(),
           }),
-        }
+        },
       );
 
       if (!response.ok) {
         throw new Error(
           await readError(
             response,
-            `Could not save category (${response.status}).`
-          )
+            `Could not save category (${response.status}).`,
+          ),
         );
       }
 
       setSuccess(
         isEditing
           ? "Category updated successfully."
-          : "Category created successfully."
+          : "Category created successfully.",
       );
 
       resetCategoryForm();
       refreshData();
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Could not save category."
-      );
+      setError(err instanceof Error ? err.message : "Could not save category.");
     } finally {
       setSavingCategory(false);
     }
@@ -572,7 +545,7 @@ export default function Home() {
 
   async function handleCategoryDelete(category: Category) {
     const confirmed = window.confirm(
-      `Delete category "${category.name}"? Products in this category will remain, but will become uncategorized.`
+      `Delete category "${category.name}"? Products in this category will remain, but will become uncategorized.`,
     );
 
     if (!confirmed) return;
@@ -582,17 +555,16 @@ export default function Home() {
     setSuccess("");
 
     try {
-      const response = await fetch(
-        `${API_URL}/api/categories/${category.id}`,
-        { method: "DELETE" }
-      );
+      const response = await apiFetch(`${API_URL}/api/categories/${category.id}`, {
+        method: "DELETE",
+      });
 
       if (!response.ok) {
         throw new Error(
           await readError(
             response,
-            `Could not delete category (${response.status}).`
-          )
+            `Could not delete category (${response.status}).`,
+          ),
         );
       }
 
@@ -608,15 +580,13 @@ export default function Home() {
       }
 
       setSuccess(
-        `Category "${category.name}" deleted. Its products have been preserved.`
+        `Category "${category.name}" deleted. Its products have been preserved.`,
       );
 
       refreshData();
     } catch (err) {
       setError(
-        err instanceof Error
-          ? err.message
-          : "Could not delete category."
+        err instanceof Error ? err.message : "Could not delete category.",
       );
     } finally {
       setDeletingCategoryId(null);
@@ -624,16 +594,15 @@ export default function Home() {
   }
 
   const availableCount = statsProducts.filter(
-    (product) => product.isAvailable
+    (product) => product.isAvailable,
   ).length;
 
   const listedValue = statsProducts.reduce(
     (total, product) => total + product.price,
-    0
+    0,
   );
 
-  const firstResult =
-    totalCount === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const firstResult = totalCount === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
 
   const lastResult = Math.min(page * PAGE_SIZE, totalCount);
 
@@ -661,9 +630,7 @@ export default function Home() {
             disabled={loading || categoriesLoading}
             className="rounded-lg border border-slate-700 px-4 py-2.5 text-sm font-medium transition hover:border-emerald-400 hover:text-emerald-400 disabled:opacity-50"
           >
-            {loading || categoriesLoading
-              ? "Refreshing..."
-              : "↻ Refresh"}
+            {loading || categoriesLoading ? "Refreshing..." : "↻ Refresh"}
           </button>
         </header>
 
@@ -743,9 +710,7 @@ export default function Home() {
                   required
                   maxLength={150}
                   value={form.name}
-                  onChange={(event) =>
-                    updateField("name", event.target.value)
-                  }
+                  onChange={(event) => updateField("name", event.target.value)}
                   placeholder="Chicken Burger"
                   className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 outline-none transition placeholder:text-slate-600 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400"
                 />
@@ -766,9 +731,7 @@ export default function Home() {
                   min="0.01"
                   step="0.01"
                   value={form.price}
-                  onChange={(event) =>
-                    updateField("price", event.target.value)
-                  }
+                  onChange={(event) => updateField("price", event.target.value)}
                   placeholder="1250.00"
                   className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 outline-none transition placeholder:text-slate-600 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400"
                 />
@@ -881,8 +844,7 @@ export default function Home() {
               </div>
 
               <span className="w-fit rounded-full bg-slate-800 px-3 py-1 text-sm text-slate-300">
-                {totalCount}{" "}
-                {totalCount === 1 ? "product" : "products"}
+                {totalCount} {totalCount === 1 ? "product" : "products"}
               </span>
             </div>
 
@@ -913,9 +875,7 @@ export default function Home() {
                   />
                 ))}
 
-                <p className="text-sm text-slate-400">
-                  Loading products...
-                </p>
+                <p className="text-sm text-slate-400">Loading products...</p>
               </div>
             ) : products.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-700 px-4 py-12 text-center">
@@ -938,8 +898,7 @@ export default function Home() {
                     const categoryName =
                       product.category?.name ??
                       categories.find(
-                        (category) =>
-                          category.id === product.categoryId
+                        (category) => category.id === product.categoryId,
                       )?.name;
 
                     return (
@@ -980,9 +939,7 @@ export default function Home() {
                           <div className="flex shrink-0 flex-wrap gap-2">
                             <button
                               type="button"
-                              onClick={() =>
-                                void toggleAvailability(product)
-                              }
+                              onClick={() => void toggleAvailability(product)}
                               className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 transition hover:border-emerald-400 hover:text-emerald-400"
                             >
                               {product.isAvailable ? "Disable" : "Enable"}
@@ -1037,9 +994,7 @@ export default function Home() {
                     <button
                       type="button"
                       onClick={() =>
-                        setPage((current) =>
-                          Math.min(totalPages, current + 1)
-                        )
+                        setPage((current) => Math.min(totalPages, current + 1))
                       }
                       disabled={
                         page >= totalPages || loading || totalPages === 0
@@ -1061,9 +1016,7 @@ export default function Home() {
               Menu organization
             </p>
 
-            <h2 className="mt-2 text-xl font-semibold">
-              Category management
-            </h2>
+            <h2 className="mt-2 text-xl font-semibold">Category management</h2>
 
             <p className="mt-1 text-sm text-slate-400">
               Organize your menu into categories such as Burgers, Drinks,
@@ -1116,10 +1069,7 @@ export default function Home() {
                   rows={3}
                   value={categoryForm.description}
                   onChange={(event) =>
-                    updateCategoryField(
-                      "description",
-                      event.target.value
-                    )
+                    updateCategoryField("description", event.target.value)
                   }
                   placeholder="Optional category description..."
                   className="w-full resize-y rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 outline-none transition placeholder:text-slate-600 focus:border-emerald-400"
@@ -1212,9 +1162,7 @@ export default function Home() {
                         <button
                           type="button"
                           disabled={deletingCategoryId === category.id}
-                          onClick={() =>
-                            void handleCategoryDelete(category)
-                          }
+                          onClick={() => void handleCategoryDelete(category)}
                           className="rounded-lg border border-red-900/70 px-3 py-2 text-sm text-red-400 transition hover:bg-red-950 disabled:opacity-50"
                         >
                           {deletingCategoryId === category.id
