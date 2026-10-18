@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("ServeFlow.Api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+e1aa8ab1723a7e32b0488994725bb3434d591508")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+f5e1fa8a5860c0a8cf72fe1bfa484b77a6833236")]
 [assembly: System.Reflection.AssemblyProductAttribute("ServeFlow.Api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("ServeFlow.Api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
