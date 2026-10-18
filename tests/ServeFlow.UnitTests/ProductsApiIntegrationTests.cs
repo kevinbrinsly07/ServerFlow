@@ -16,190 +16,202 @@ namespace ServeFlow.UnitTests;
 
 public class ProductsApiFactory : WebApplicationFactory<Program>
 {
-    private readonly string _databaseName = Guid.NewGuid().ToString();
+     private readonly string _databaseName = Guid.NewGuid().ToString();
 
-    protected override void ConfigureWebHost(IWebHostBuilder builder)
-    {
-        builder.ConfigureServices(services =>
-        {
-            services.RemoveAll<
-                IDbContextOptionsConfiguration<ServeFlowDbContext>>();
+     protected override void ConfigureWebHost(IWebHostBuilder builder)
+     {
+          builder.ConfigureServices(services =>
+          {
+               services.RemoveAll<
+                 IDbContextOptionsConfiguration<ServeFlowDbContext>>();
 
-            services.RemoveAll<DbContextOptions<ServeFlowDbContext>>();
-            services.RemoveAll<ServeFlowDbContext>();
+               services.RemoveAll<DbContextOptions<ServeFlowDbContext>>();
+               services.RemoveAll<ServeFlowDbContext>();
 
-            services.AddDbContext<ServeFlowDbContext>(options =>
-                options.UseInMemoryDatabase(_databaseName));
-        });
-    }
+               services.AddDbContext<ServeFlowDbContext>(options =>
+                 options.UseInMemoryDatabase(_databaseName));
+          });
+     }
 }
 
 public class ProductsApiIntegrationTests
     : IClassFixture<ProductsApiFactory>
 {
-    private readonly HttpClient _client;
+     private readonly HttpClient _client;
 
-    public ProductsApiIntegrationTests(ProductsApiFactory factory)
-    {
-        _client = factory.CreateClient();
-    }
+     public ProductsApiIntegrationTests(ProductsApiFactory factory)
+     {
+          _client = factory.CreateClient();
+     }
 
-    [Fact]
-    public async Task GetProducts_ReturnsSuccess()
-    {
-        var response = await _client.GetAsync("/api/products");
+     [Fact]
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var products = await response.Content
-            .ReadFromJsonAsync<List<Product>>();
+     public async Task GetProducts_ReturnsSuccess()
+     {
+          var response = await _client.GetAsync("/api/products");
 
-        Assert.NotNull(products);
-    }
+          response.EnsureSuccessStatusCode();
 
-    [Fact]
-    public async Task CreateProduct_ReturnsCreatedProduct()
-    {
-        var request = new
-        {
-            name = "Integration Test Burger",
-            price = 1250m,
-            description = "Created through HTTP"
-        };
+          var result = await response.Content.ReadFromJsonAsync<JsonElement>();
 
-        var response = await _client.PostAsJsonAsync(
-            "/api/products", request);
+          Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+          Assert.True(result.TryGetProperty("items", out var items));
+          Assert.True(result.TryGetProperty("page", out var page));
+          Assert.True(result.TryGetProperty("pageSize", out var pageSize));
+          Assert.True(result.TryGetProperty("totalCount", out var totalCount));
+          Assert.True(result.TryGetProperty("totalPages", out var totalPages));
 
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+          Assert.Equal(1, page.GetInt32());
+          Assert.Equal(10, pageSize.GetInt32());
+          Assert.Equal(0, totalCount.GetInt32());
+          Assert.Equal(0, totalPages.GetInt32());
+          Assert.Equal(JsonValueKind.Array, items.ValueKind);
+     }
 
-        var product = await response.Content
-            .ReadFromJsonAsync<Product>();
+     [Fact]
+     public async Task CreateProduct_ReturnsCreatedProduct()
+     {
+          var request = new
+          {
+               name = "Integration Test Burger",
+               price = 1250m,
+               description = "Created through HTTP"
+          };
 
-        Assert.NotNull(product);
-        Assert.NotEqual(Guid.Empty, product.Id);
-        Assert.Equal("Integration Test Burger", product.Name);
-        Assert.Equal(1250m, product.Price);
-    }
+          var response = await _client.PostAsJsonAsync(
+              "/api/products", request);
 
-    [Fact]
-    public async Task GetProduct_ReturnsProductAfterCreation()
-    {
-        var request = new
-        {
-            name = "Read Test Product",
-            price = 900m,
-            description = "Test description"
-        };
+          Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        var createResponse = await _client.PostAsJsonAsync(
-            "/api/products", request);
+          var product = await response.Content
+              .ReadFromJsonAsync<Product>();
 
-        Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
+          Assert.NotNull(product);
+          Assert.NotEqual(Guid.Empty, product.Id);
+          Assert.Equal("Integration Test Burger", product.Name);
+          Assert.Equal(1250m, product.Price);
+     }
 
-        var created = await createResponse.Content
-            .ReadFromJsonAsync<Product>();
+     [Fact]
+     public async Task GetProduct_ReturnsProductAfterCreation()
+     {
+          var request = new
+          {
+               name = "Read Test Product",
+               price = 900m,
+               description = "Test description"
+          };
 
-        Assert.NotNull(created);
+          var createResponse = await _client.PostAsJsonAsync(
+              "/api/products", request);
 
-        var response = await _client.GetAsync(
-            $"/api/products/{created.Id}");
+          Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+          var created = await createResponse.Content
+              .ReadFromJsonAsync<Product>();
 
-        var product = await response.Content
-            .ReadFromJsonAsync<Product>();
+          Assert.NotNull(created);
 
-        Assert.NotNull(product);
-        Assert.Equal(created.Id, product.Id);
-        Assert.Equal("Read Test Product", product.Name);
-    }
+          var response = await _client.GetAsync(
+              $"/api/products/{created.Id}");
 
-    [Fact]
-    public async Task UpdateProduct_ChangesProduct()
-    {
-        var createResponse = await _client.PostAsJsonAsync(
-            "/api/products",
-            new
-            {
-                name = "Original Product",
-                price = 1000m,
-                description = "Original description"
-            });
+          Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
+          var product = await response.Content
+              .ReadFromJsonAsync<Product>();
 
-        var created = await createResponse.Content
-            .ReadFromJsonAsync<Product>();
+          Assert.NotNull(product);
+          Assert.Equal(created.Id, product.Id);
+          Assert.Equal("Read Test Product", product.Name);
+     }
 
-        Assert.NotNull(created);
+     [Fact]
+     public async Task UpdateProduct_ChangesProduct()
+     {
+          var createResponse = await _client.PostAsJsonAsync(
+              "/api/products",
+              new
+              {
+                   name = "Original Product",
+                   price = 1000m,
+                   description = "Original description"
+              });
 
-        var updateResponse = await _client.PutAsJsonAsync(
-            $"/api/products/{created.Id}",
-            new
-            {
-                name = "Updated Product",
-                price = 1500m,
-                description = "Updated description",
-                isAvailable = false
-            });
+          Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
 
-        Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
+          var created = await createResponse.Content
+              .ReadFromJsonAsync<Product>();
 
-        var updated = await updateResponse.Content
-            .ReadFromJsonAsync<Product>();
+          Assert.NotNull(created);
 
-        Assert.NotNull(updated);
-        Assert.Equal("Updated Product", updated.Name);
-        Assert.Equal(1500m, updated.Price);
-        Assert.False(updated.IsAvailable);
-    }
+          var updateResponse = await _client.PutAsJsonAsync(
+              $"/api/products/{created.Id}",
+              new
+              {
+                   name = "Updated Product",
+                   price = 1500m,
+                   description = "Updated description",
+                   isAvailable = false
+              });
 
-    [Fact]
-    public async Task DeleteProduct_RemovesProduct()
-    {
-        var createResponse = await _client.PostAsJsonAsync(
-            "/api/products",
-            new
-            {
-                name = "Product To Delete",
-                price = 500m,
-                description = "Temporary product"
-            });
+          Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
 
-        Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
+          var updated = await updateResponse.Content
+              .ReadFromJsonAsync<Product>();
 
-        var created = await createResponse.Content
-            .ReadFromJsonAsync<Product>();
+          Assert.NotNull(updated);
+          Assert.Equal("Updated Product", updated.Name);
+          Assert.Equal(1500m, updated.Price);
+          Assert.False(updated.IsAvailable);
+     }
 
-        Assert.NotNull(created);
+     [Fact]
+     public async Task DeleteProduct_RemovesProduct()
+     {
+          var createResponse = await _client.PostAsJsonAsync(
+              "/api/products",
+              new
+              {
+                   name = "Product To Delete",
+                   price = 500m,
+                   description = "Temporary product"
+              });
 
-        var deleteResponse = await _client.DeleteAsync(
-            $"/api/products/{created.Id}");
+          Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
 
-        Assert.Equal(
-            HttpStatusCode.NoContent,
-            deleteResponse.StatusCode);
+          var created = await createResponse.Content
+              .ReadFromJsonAsync<Product>();
 
-        var getResponse = await _client.GetAsync(
-            $"/api/products/{created.Id}");
+          Assert.NotNull(created);
 
-        Assert.Equal(HttpStatusCode.NotFound, getResponse.StatusCode);
-    }
+          var deleteResponse = await _client.DeleteAsync(
+              $"/api/products/{created.Id}");
 
-    [Fact]
-    public async Task CreateProduct_ReturnsBadRequestForInvalidPrice()
-    {
-        var response = await _client.PostAsJsonAsync(
-            "/api/products",
-            new
-            {
-                name = "Invalid Product",
-                price = 0m,
-                description = "Invalid price test"
-            });
+          Assert.Equal(
+              HttpStatusCode.NoContent,
+              deleteResponse.StatusCode);
 
-        Assert.Equal(
-            HttpStatusCode.BadRequest,
-            response.StatusCode);
-    }
+          var getResponse = await _client.GetAsync(
+              $"/api/products/{created.Id}");
+
+          Assert.Equal(HttpStatusCode.NotFound, getResponse.StatusCode);
+     }
+
+     [Fact]
+     public async Task CreateProduct_ReturnsBadRequestForInvalidPrice()
+     {
+          var response = await _client.PostAsJsonAsync(
+              "/api/products",
+              new
+              {
+                   name = "Invalid Product",
+                   price = 0m,
+                   description = "Invalid price test"
+              });
+
+          Assert.Equal(
+              HttpStatusCode.BadRequest,
+              response.StatusCode);
+     }
 }

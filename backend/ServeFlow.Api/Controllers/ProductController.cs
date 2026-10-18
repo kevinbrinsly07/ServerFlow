@@ -18,16 +18,48 @@ public class ProductsController : ControllerBase
         _dbContext = dbContext;
     }
 
-    [HttpGet]
-    public async Task<ActionResult<IEnumerable<Product>>> GetProducts()
-    {
-        var products = await _dbContext.Products
-            .AsNoTracking()
-            .OrderBy(product => product.Name)
-            .ToListAsync();
+    
+[HttpGet]
+public async Task<IActionResult> GetProducts(
+    [FromQuery] string? search,
+    [FromQuery] int page = 1,
+    [FromQuery] int pageSize = 10)
+{
+    page = Math.Max(page, 1);
+    pageSize = Math.Clamp(pageSize, 1, 100);
 
-        return Ok(products);
+    var query = _dbContext.Products.AsNoTracking();
+
+    if (!string.IsNullOrWhiteSpace(search))
+    {
+        var searchTerm = search.Trim().ToLower();
+
+        query = query.Where(product =>
+            product.Name.ToLower().Contains(searchTerm) ||
+            product.Description.ToLower().Contains(searchTerm));
     }
+
+    var totalCount = await query.CountAsync();
+
+    var products = await query
+        .OrderBy(product => product.Name)
+        .Skip((page - 1) * pageSize)
+        .Take(pageSize)
+        .ToListAsync();
+
+    var totalPages = (int)Math.Ceiling(
+        totalCount / (double)pageSize);
+
+    return Ok(new
+    {
+        items = products,
+        page,
+        pageSize,
+        totalCount,
+        totalPages
+    });
+}
+
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<Product>> GetProduct(Guid id)

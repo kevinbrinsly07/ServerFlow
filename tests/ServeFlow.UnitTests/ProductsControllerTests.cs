@@ -11,164 +11,178 @@ namespace ServeFlow.UnitTests;
 
 public class ProductsControllerTests
 {
-    private static ServeFlowDbContext CreateDbContext()
-    {
-        var options = new DbContextOptionsBuilder<ServeFlowDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
-            .Options;
+     private static ServeFlowDbContext CreateDbContext()
+     {
+          var options = new DbContextOptionsBuilder<ServeFlowDbContext>()
+              .UseInMemoryDatabase(Guid.NewGuid().ToString())
+              .Options;
 
-        return new ServeFlowDbContext(options);
-    }
+          return new ServeFlowDbContext(options);
+     }
 
-    [Fact]
-    public async Task GetProducts_ReturnsEmptyList_WhenNoProductsExist()
-    {
-        using var dbContext = CreateDbContext();
-        var controller = new ProductsController(dbContext);
 
-        var result = await controller.GetProducts();
+     [Fact]
+     public async Task GetProducts_ReturnsEmptyList_WhenNoProductsExist()
+     {
+          using var dbContext = CreateDbContext();
+          var controller = new ProductsController(dbContext);
 
-        var response = Assert.IsType<OkObjectResult>(result.Result);
-        var products = Assert.IsAssignableFrom<IEnumerable<Product>>(
-            response.Value);
+          var result = await controller.GetProducts(
+              search: null,
+              page: 1,
+              pageSize: 10);
 
-        Assert.Empty(products);
-    }
+          var okResult = Assert.IsType<OkObjectResult>(result);
 
-    [Fact]
-    public async Task CreateProduct_SavesProduct_WhenRequestIsValid()
-    {
-        using var dbContext = CreateDbContext();
-        var controller = new ProductsController(dbContext);
+          Assert.NotNull(okResult.Value);
 
-        var request = new CreateProductRequest(
-            "Chicken Burger",
-            1250m,
-            "Grilled chicken burger");
+          var response = okResult.Value;
 
-        var result = await controller.CreateProduct(request);
+          var itemsProperty = response.GetType().GetProperty("items");
 
-        var response = Assert.IsType<CreatedAtActionResult>(result.Result);
-        var product = Assert.IsType<Product>(response.Value);
+          Assert.NotNull(itemsProperty);
 
-        Assert.Equal("Chicken Burger", product.Name);
-        Assert.Equal(1250m, product.Price);
-        Assert.Equal("Grilled chicken burger", product.Description);
-        Assert.Equal(1, await dbContext.Products.CountAsync());
-    }
+          var products = Assert.IsAssignableFrom<IEnumerable<Product>>(
+              itemsProperty.GetValue(response));
 
-    [Fact]
-    public async Task CreateProduct_ReturnsBadRequest_WhenNameIsEmpty()
-    {
-        using var dbContext = CreateDbContext();
-        var controller = new ProductsController(dbContext);
+          Assert.Empty(products);
+     }
 
-        var request = new CreateProductRequest(
-            " ",
-            1250m,
-            "Test description");
 
-        var result = await controller.CreateProduct(request);
+     [Fact]
+     public async Task CreateProduct_SavesProduct_WhenRequestIsValid()
+     {
+          using var dbContext = CreateDbContext();
+          var controller = new ProductsController(dbContext);
 
-        Assert.IsType<BadRequestObjectResult>(result.Result);
-        Assert.Equal(0, await dbContext.Products.CountAsync());
-    }
+          var request = new CreateProductRequest(
+              "Chicken Burger",
+              1250m,
+              "Grilled chicken burger");
 
-    [Fact]
-    public async Task CreateProduct_ReturnsBadRequest_WhenPriceIsZero()
-    {
-        using var dbContext = CreateDbContext();
-        var controller = new ProductsController(dbContext);
+          var result = await controller.CreateProduct(request);
 
-        var request = new CreateProductRequest(
-            "Chicken Burger",
-            0m,
-            "Test description");
+          var response = Assert.IsType<CreatedAtActionResult>(result.Result);
+          var product = Assert.IsType<Product>(response.Value);
 
-        var result = await controller.CreateProduct(request);
+          Assert.Equal("Chicken Burger", product.Name);
+          Assert.Equal(1250m, product.Price);
+          Assert.Equal("Grilled chicken burger", product.Description);
+          Assert.Equal(1, await dbContext.Products.CountAsync());
+     }
 
-        Assert.IsType<BadRequestObjectResult>(result.Result);
-        Assert.Equal(0, await dbContext.Products.CountAsync());
-    }
+     [Fact]
+     public async Task CreateProduct_ReturnsBadRequest_WhenNameIsEmpty()
+     {
+          using var dbContext = CreateDbContext();
+          var controller = new ProductsController(dbContext);
 
-    [Fact]
-    public async Task GetProduct_ReturnsNotFound_WhenProductDoesNotExist()
-    {
-        using var dbContext = CreateDbContext();
-        var controller = new ProductsController(dbContext);
+          var request = new CreateProductRequest(
+              " ",
+              1250m,
+              "Test description");
 
-        var result = await controller.GetProduct(Guid.NewGuid());
+          var result = await controller.CreateProduct(request);
 
-        Assert.IsType<NotFoundResult>(result.Result);
-    }
+          Assert.IsType<BadRequestObjectResult>(result.Result);
+          Assert.Equal(0, await dbContext.Products.CountAsync());
+     }
 
-    [Fact]
-    public async Task UpdateProduct_ChangesProductDetails()
-    {
-        using var dbContext = CreateDbContext();
+     [Fact]
+     public async Task CreateProduct_ReturnsBadRequest_WhenPriceIsZero()
+     {
+          using var dbContext = CreateDbContext();
+          var controller = new ProductsController(dbContext);
 
-        var product = new Product
-        {
-            Name = "Old Burger",
-            Description = "Old description",
-            Price = 1000m,
-            IsAvailable = true
-        };
+          var request = new CreateProductRequest(
+              "Chicken Burger",
+              0m,
+              "Test description");
 
-        dbContext.Products.Add(product);
-        await dbContext.SaveChangesAsync();
+          var result = await controller.CreateProduct(request);
 
-        var controller = new ProductsController(dbContext);
+          Assert.IsType<BadRequestObjectResult>(result.Result);
+          Assert.Equal(0, await dbContext.Products.CountAsync());
+     }
 
-        var request = new UpdateProductRequest(
-            "New Burger",
-            1500m,
-            "Updated description",
-            false);
+     [Fact]
+     public async Task GetProduct_ReturnsNotFound_WhenProductDoesNotExist()
+     {
+          using var dbContext = CreateDbContext();
+          var controller = new ProductsController(dbContext);
 
-        var result = await controller.UpdateProduct(product.Id, request);
+          var result = await controller.GetProduct(Guid.NewGuid());
 
-        var response = Assert.IsType<OkObjectResult>(result.Result);
-        var updatedProduct = Assert.IsType<Product>(response.Value);
+          Assert.IsType<NotFoundResult>(result.Result);
+     }
 
-        Assert.Equal("New Burger", updatedProduct.Name);
-        Assert.Equal(1500m, updatedProduct.Price);
-        Assert.Equal("Updated description", updatedProduct.Description);
-        Assert.False(updatedProduct.IsAvailable);
-    }
+     [Fact]
+     public async Task UpdateProduct_ChangesProductDetails()
+     {
+          using var dbContext = CreateDbContext();
 
-    [Fact]
-    public async Task DeleteProduct_RemovesProduct_WhenItExists()
-    {
-        using var dbContext = CreateDbContext();
+          var product = new Product
+          {
+               Name = "Old Burger",
+               Description = "Old description",
+               Price = 1000m,
+               IsAvailable = true
+          };
 
-        var product = new Product
-        {
-            Name = "Burger",
-            Description = "Test product",
-            Price = 1000m
-        };
+          dbContext.Products.Add(product);
+          await dbContext.SaveChangesAsync();
 
-        dbContext.Products.Add(product);
-        await dbContext.SaveChangesAsync();
+          var controller = new ProductsController(dbContext);
 
-        var controller = new ProductsController(dbContext);
+          var request = new UpdateProductRequest(
+              "New Burger",
+              1500m,
+              "Updated description",
+              false);
 
-        var result = await controller.DeleteProduct(product.Id);
+          var result = await controller.UpdateProduct(product.Id, request);
 
-        Assert.IsType<NoContentResult>(result);
-        Assert.Null(await dbContext.Products.FindAsync(product.Id));
-    }
+          var response = Assert.IsType<OkObjectResult>(result.Result);
+          var updatedProduct = Assert.IsType<Product>(response.Value);
 
-    [Fact]
-    public async Task DeleteProduct_ReturnsNotFound_WhenProductDoesNotExist()
-    {
-        using var dbContext = CreateDbContext();
-        var controller = new ProductsController(dbContext);
+          Assert.Equal("New Burger", updatedProduct.Name);
+          Assert.Equal(1500m, updatedProduct.Price);
+          Assert.Equal("Updated description", updatedProduct.Description);
+          Assert.False(updatedProduct.IsAvailable);
+     }
 
-        var result = await controller.DeleteProduct(Guid.NewGuid());
+     [Fact]
+     public async Task DeleteProduct_RemovesProduct_WhenItExists()
+     {
+          using var dbContext = CreateDbContext();
 
-        var response = Assert.IsType<NotFoundObjectResult>(result);
-        Assert.NotNull(response.Value);
-    }
+          var product = new Product
+          {
+               Name = "Burger",
+               Description = "Test product",
+               Price = 1000m
+          };
+
+          dbContext.Products.Add(product);
+          await dbContext.SaveChangesAsync();
+
+          var controller = new ProductsController(dbContext);
+
+          var result = await controller.DeleteProduct(product.Id);
+
+          Assert.IsType<NoContentResult>(result);
+          Assert.Null(await dbContext.Products.FindAsync(product.Id));
+     }
+
+     [Fact]
+     public async Task DeleteProduct_ReturnsNotFound_WhenProductDoesNotExist()
+     {
+          using var dbContext = CreateDbContext();
+          var controller = new ProductsController(dbContext);
+
+          var result = await controller.DeleteProduct(Guid.NewGuid());
+
+          var response = Assert.IsType<NotFoundObjectResult>(result);
+          Assert.NotNull(response.Value);
+     }
 }
