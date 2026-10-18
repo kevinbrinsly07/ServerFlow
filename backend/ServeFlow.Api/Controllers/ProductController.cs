@@ -154,7 +154,12 @@ public class ProductsController : ControllerBase
             "Created",
             "Product",
             product.Id.ToString(),
-            $"Created product '{product.Name}'.");
+            $"Created product '{product.Name}'. " +
+            $"Details: Name='{product.Name}'; " +
+            $"Description='{product.Description}'; " +
+            $"Price={product.Price}; " +
+            $"IsAvailable={product.IsAvailable}; " +
+            $"Category='{category?.Name ?? "None"}'.");
 
         await _dbContext.SaveChangesAsync();
 
@@ -224,19 +229,58 @@ public class ProductsController : ControllerBase
             }
         }
 
+        var newDescription = request.Description?.Trim() ?? string.Empty;
+
+        var changes = new List<string>();
+
+        if (product.Name != name)
+        {
+            changes.Add($"Name: '{product.Name}' → '{name}'");
+        }
+
+        if (product.Description != newDescription)
+        {
+            changes.Add(
+                $"Description: '{product.Description}' → '{newDescription}'");
+        }
+
+        if (product.Price != request.Price)
+        {
+            changes.Add($"Price: {product.Price} → {request.Price}");
+        }
+
+        if (product.IsAvailable != request.IsAvailable)
+        {
+            changes.Add(
+                $"IsAvailable: {product.IsAvailable} → {request.IsAvailable}");
+        }
+
+        var oldCategoryName = product.Category?.Name ?? "None";
+        var newCategoryName = category?.Name ?? "None";
+
+        if (product.CategoryId != category?.Id)
+        {
+            changes.Add(
+                $"Category: '{oldCategoryName}' → '{newCategoryName}'");
+        }
+
         product.Name = name;
-        product.Description = request.Description?.Trim() ?? string.Empty;
+        product.Description = newDescription;
         product.Price = request.Price;
         product.IsAvailable = request.IsAvailable;
         product.CategoryId = category?.Id;
         product.Category = category;
+
+        var changeDetails = changes.Count > 0
+            ? $" Changes: {string.Join("; ", changes)}."
+            : " No field values changed.";
 
         _auditLogService.Add(
             User,
             "Updated",
             "Product",
             product.Id.ToString(),
-            $"Updated product '{product.Name}'.");
+            $"Updated product '{product.Name}'.{changeDetails}");
 
         await _dbContext.SaveChangesAsync();
 
@@ -265,7 +309,11 @@ public class ProductsController : ControllerBase
             "Deleted",
             "Product",
             product.Id.ToString(),
-            $"Deleted product '{product.Name}'.");
+            $"Deleted product '{product.Name}'. " +
+            $"Details: Description='{product.Description}'; " +
+            $"Price={product.Price}; " +
+            $"IsAvailable={product.IsAvailable}; " +
+            $"CategoryId='{product.CategoryId?.ToString() ?? "None"}'.");
 
         _dbContext.Products.Remove(product);
         await _dbContext.SaveChangesAsync();

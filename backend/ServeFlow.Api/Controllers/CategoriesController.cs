@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using ServeFlow.Api.Contracts.Categories;
 using ServeFlow.Domain.Entities;
 using ServeFlow.Infrastructure.Data;
+using ServeFlow.Infrastructure.Services;
 
 namespace ServeFlow.Api.Controllers;
 
@@ -13,10 +14,14 @@ namespace ServeFlow.Api.Controllers;
 public class CategoriesController : ControllerBase
 {
     private readonly ServeFlowDbContext _dbContext;
+    private readonly AuditLogService _auditLogService;
 
-    public CategoriesController(ServeFlowDbContext dbContext)
+    public CategoriesController(
+        ServeFlowDbContext dbContext,
+        AuditLogService auditLogService)
     {
         _dbContext = dbContext;
+        _auditLogService = auditLogService;
     }
 
     // GET: api/categories
@@ -104,6 +109,16 @@ public class CategoriesController : ControllerBase
         };
 
         _dbContext.Categories.Add(category);
+
+        _auditLogService.Add(
+            User,
+            "Created",
+            "Category",
+            category.Id.ToString(),
+            $"Created category '{category.Name}'. " +
+            $"Details: Name='{category.Name}'; " +
+            $"Description='{category.Description ?? string.Empty}'.");
+
         await _dbContext.SaveChangesAsync();
 
         return CreatedAtAction(
@@ -160,8 +175,35 @@ public class CategoriesController : ControllerBase
             });
         }
 
+        var newDescription = request.Description?.Trim();
+
+        var changes = new List<string>();
+
+        if (category.Name != name)
+        {
+            changes.Add($"Name: '{category.Name}' → '{name}'");
+        }
+
+        if (category.Description != newDescription)
+        {
+            changes.Add(
+                $"Description: '{category.Description ?? string.Empty}' " +
+                $"→ '{newDescription ?? string.Empty}'");
+        }
+
         category.Name = name;
-        category.Description = request.Description?.Trim();
+        category.Description = newDescription;
+
+        var changeDetails = changes.Count > 0
+            ? $" Changes: {string.Join("; ", changes)}."
+            : " No field values changed.";
+
+        _auditLogService.Add(
+            User,
+            "Updated",
+            "Category",
+            category.Id.ToString(),
+            $"Updated category '{category.Name}'.{changeDetails}");
 
         await _dbContext.SaveChangesAsync();
 
@@ -193,6 +235,8 @@ public class CategoriesController : ControllerBase
             });
         }
 
+        var categoryName = category.Name;
+
         // Keep products and remove their category association first.
         var products = await _dbContext.Products
             .Where(product => product.CategoryId == id)
@@ -205,6 +249,16 @@ public class CategoriesController : ControllerBase
         }
 
         _dbContext.Categories.Remove(category);
+
+        _auditLogService.Add(
+            User,
+            "Deleted",
+            "Category",
+            category.Id.ToString(),
+            $"Deleted category '{categoryName}'. " +
+            $"Details: Name='{categoryName}'; " +
+            $"Description='{category.Description ?? string.Empty}'; " +
+            $"Products unassigned={products.Count}.");
 
         await _dbContext.SaveChangesAsync();
 

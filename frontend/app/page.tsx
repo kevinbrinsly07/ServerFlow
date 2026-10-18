@@ -648,13 +648,15 @@ export default function Home() {
               </div>
             )}
 
-            <button
-              type="button"
-              onClick={logout}
-              className="rounded-lg border border-red-900 px-4 py-2.5 text-sm font-medium text-red-400 transition hover:bg-red-950"
-            >
-              Sign out
-            </button>
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => router.push("/audit-logs")}
+                className="rounded-lg border border-emerald-800 px-4 py-2.5 text-sm font-medium text-emerald-400 transition hover:bg-emerald-950"
+              >
+                Audit History
+              </button>
+            )}
 
             <button
               type="button"
@@ -663,6 +665,14 @@ export default function Home() {
               className="rounded-lg border border-slate-700 px-4 py-2.5 text-sm font-medium transition hover:border-emerald-400 hover:text-emerald-400 disabled:opacity-50"
             >
               {loading || categoriesLoading ? "Refreshing..." : "↻ Refresh"}
+            </button>
+
+            <button
+              type="button"
+              onClick={logout}
+              className="rounded-lg border border-red-900 px-4 py-2.5 text-sm font-medium text-red-400 transition hover:bg-red-950"
+            >
+              Sign out
             </button>
           </div>
         </header>
