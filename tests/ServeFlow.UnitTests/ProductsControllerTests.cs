@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ServeFlow.Api.Controllers;
+using ServeFlow.Api.Contracts.Products;
 using ServeFlow.Domain.Entities;
 using ServeFlow.Infrastructure.Data;
 using Xunit;

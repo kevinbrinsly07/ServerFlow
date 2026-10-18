@@ -1,6 +1,7 @@
 
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using ServeFlow.Api.Contracts.Products;
 using ServeFlow.Domain.Entities;
 using ServeFlow.Infrastructure.Data;
 
@@ -47,12 +48,28 @@ public class ProductsController : ControllerBase
     public async Task<ActionResult<Product>> CreateProduct(
         CreateProductRequest request)
     {
-        var validationError = ValidateProduct(
-            request.Name, request.Price);
-
-        if (validationError is not null)
+        if (string.IsNullOrWhiteSpace(request.Name))
         {
-            return BadRequest(new { message = validationError });
+            return BadRequest(new
+            {
+                message = "Product name is required."
+            });
+        }
+
+        if (request.Name.Trim().Length > 150)
+        {
+            return BadRequest(new
+            {
+                message = "Product name cannot exceed 150 characters."
+            });
+        }
+
+        if (request.Price <= 0)
+        {
+            return BadRequest(new
+            {
+                message = "Price must be greater than zero."
+            });
         }
 
         var product = new Product
@@ -81,15 +98,34 @@ public class ProductsController : ControllerBase
 
         if (product is null)
         {
-            return NotFound(new { message = "Product not found." });
+            return NotFound(new
+            {
+                message = "Product not found."
+            });
         }
 
-        var validationError = ValidateProduct(
-            request.Name, request.Price);
-
-        if (validationError is not null)
+        if (string.IsNullOrWhiteSpace(request.Name))
         {
-            return BadRequest(new { message = validationError });
+            return BadRequest(new
+            {
+                message = "Product name is required."
+            });
+        }
+
+        if (request.Name.Trim().Length > 150)
+        {
+            return BadRequest(new
+            {
+                message = "Product name cannot exceed 150 characters."
+            });
+        }
+
+        if (request.Price <= 0)
+        {
+            return BadRequest(new
+            {
+                message = "Price must be greater than zero."
+            });
         }
 
         product.Name = request.Name.Trim();
@@ -110,7 +146,10 @@ public class ProductsController : ControllerBase
 
         if (product is null)
         {
-            return NotFound(new { message = "Product not found." });
+            return NotFound(new
+            {
+                message = "Product not found."
+            });
         }
 
         _dbContext.Products.Remove(product);
@@ -118,37 +157,4 @@ public class ProductsController : ControllerBase
 
         return NoContent();
     }
-
-    private static string? ValidateProduct(string? name, decimal price)
-    {
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            return "Product name is required.";
-        }
-
-        if (name.Trim().Length > 150)
-        {
-            return "Product name cannot exceed 150 characters.";
-        }
-
-        if (price <= 0)
-        {
-            return "Price must be greater than zero.";
-        }
-
-        return null;
-    }
 }
-
-public record CreateProductRequest(
-    string Name,
-    decimal Price,
-    string? Description
-);
-
-public record UpdateProductRequest(
-    string Name,
-    decimal Price,
-    string? Description,
-    bool IsAvailable
-);
