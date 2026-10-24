@@ -189,6 +189,13 @@ dotnet run --no-launch-profile \
   --urls http://localhost:5080
 ```
 
+
+``` bash
+export Jwt__Key="a_very_long_secret_key_that_is_at_least_32_bytes_long!!"
+dotnet run --no-launch-profile --project backend/ServeFlow.Api --urls http://localhost:5080
+```
+
+
 The API will be available at:
 
 -   API base URL: `http://localhost:5080`

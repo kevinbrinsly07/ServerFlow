@@ -348,7 +348,7 @@ export default function Home() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
 
     setSaving(true);
@@ -613,7 +613,7 @@ export default function Home() {
   const lastResult = Math.min(page * PAGE_SIZE, totalCount);
 
   return (
-    <main className="min-h-screen bg-slate-950 px-4 py-8 text-white sm:px-6 lg:px-10">
+    <main className="min-h-screen bg-black px-4 py-8 text-white sm:px-6 lg:px-10">
       <div className="mx-auto max-w-7xl">
         <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -625,7 +625,7 @@ export default function Home() {
               ServeFlow
             </h1>
 
-            <p className="mt-2 text-slate-400">
+            <p className="mt-2 text-neutral-500">
               Manage your restaurant menu in one place.
             </p>
           </div>
@@ -722,7 +722,7 @@ export default function Home() {
         </section>
 
         <div className="grid items-start gap-6 lg:grid-cols-[0.85fr_1.5fr]">
-          <section className="rounded-2xl border border-slate-800 bg-slate-900 p-5 sm:p-6">
+          <section className="rounded-2xl border border-neutral-700 bg-neutral-900 p-5 sm:p-6">
             <div className="mb-6">
               <p className="text-xs font-semibold uppercase tracking-widest text-emerald-400">
                 Product management
@@ -732,7 +732,7 @@ export default function Home() {
                 {editingId ? "Edit product" : "Add a menu item"}
               </h2>
 
-              <p className="mt-1 text-sm text-slate-400">
+              <p className="mt-1 text-sm text-neutral-300">
                 {editingId
                   ? "Update the selected product's details."
                   : "Create a new product for your menu."}
@@ -743,7 +743,7 @@ export default function Home() {
               <div>
                 <label
                   htmlFor="name"
-                  className="mb-2 block text-sm font-medium text-slate-300"
+                  className="mb-2 block text-sm font-medium text-neutral-300"
                 >
                   Product name
                 </label>
@@ -755,14 +755,14 @@ export default function Home() {
                   value={form.name}
                   onChange={(event) => updateField("name", event.target.value)}
                   placeholder="Chicken Burger"
-                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 outline-none transition placeholder:text-slate-600 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400"
+                  className="w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-3 outline-none transition placeholder:text-neutral-500 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400"
                 />
               </div>
 
               <div>
                 <label
                   htmlFor="price"
-                  className="mb-2 block text-sm font-medium text-slate-300"
+                  className="mb-2 block text-sm font-medium text-neutral-300"
                 >
                   Price (LKR)
                 </label>
@@ -776,14 +776,14 @@ export default function Home() {
                   value={form.price}
                   onChange={(event) => updateField("price", event.target.value)}
                   placeholder="1250.00"
-                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 outline-none transition placeholder:text-slate-600 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400"
+                  className="w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-3 outline-none transition placeholder:text-neutral-300 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400"
                 />
               </div>
 
               <div>
                 <label
                   htmlFor="productCategory"
-                  className="mb-2 block text-sm font-medium text-slate-300"
+                  className="mb-2 block text-sm font-medium text-neutral-300"
                 >
                   Category
                 </label>
@@ -795,7 +795,7 @@ export default function Home() {
                     updateField("categoryId", event.target.value)
                   }
                   disabled={categoriesLoading}
-                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none transition focus:border-emerald-400 disabled:opacity-50"
+                  className="w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-3 text-neutral-300 outline-none transition focus:border-emerald-400 disabled:opacity-50"
                 >
                   <option value="">Uncategorized</option>
 
@@ -816,7 +816,7 @@ export default function Home() {
               <div>
                 <label
                   htmlFor="description"
-                  className="mb-2 block text-sm font-medium text-slate-300"
+                  className="mb-2 block text-sm font-medium text-neutral-300"
                 >
                   Description
                 </label>
@@ -830,22 +830,22 @@ export default function Home() {
                     updateField("description", event.target.value)
                   }
                   placeholder="Describe the menu item..."
-                  className="w-full resize-y rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 outline-none transition placeholder:text-slate-600 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400"
+                  className="w-full resize-y rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-3 outline-none transition placeholder:text-neutral-300 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400"
                 />
               </div>
 
               {editingId && (
-                <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-800 bg-slate-950 p-3">
+                <label className="flex cursor-pointer items-center gap-3 p-3">
                   <input
                     type="checkbox"
                     checked={form.isAvailable}
                     onChange={(event) =>
                       updateField("isAvailable", event.target.checked)
                     }
-                    className="h-4 w-4 accent-emerald-400"
+                    className="h-4 w-4 accent-emerald-400 bg-neutral-700"
                   />
 
-                  <span className="text-sm text-slate-300">
+                  <span className="text-sm text-neutral-300">
                     Product is available
                   </span>
                 </label>
@@ -876,17 +876,17 @@ export default function Home() {
             </form>
           </section>
 
-          <section className="min-w-0 rounded-2xl border border-slate-800 bg-slate-900 p-5 sm:p-6">
+          <section className="min-w-0 rounded-2xl border border-neutral-700 bg-neutral-900 p-5 sm:p-6">
             <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-xl font-semibold">Menu items</h2>
 
-                <p className="mt-1 text-sm text-slate-400">
+                <p className="mt-1 text-sm text-neutral-500">
                   Search, edit, or manage your products.
                 </p>
               </div>
 
-              <span className="w-fit rounded-full bg-slate-800 px-3 py-1 text-sm text-slate-300">
+              <span className="w-fit rounded-full bg-neutral-700 px-3 py-1 text-sm text-neutral-300">
                 {totalCount} {totalCount === 1 ? "product" : "products"}
               </span>
             </div>
@@ -905,7 +905,7 @@ export default function Home() {
                   setPage(1);
                 }}
                 placeholder="Search products..."
-                className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 outline-none placeholder:text-slate-600 focus:border-emerald-400"
+                className="w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-3 outline-none placeholder:text-neutral-500 focus:border-emerald-400"
               />
             </div>
 
@@ -918,10 +918,10 @@ export default function Home() {
                   />
                 ))}
 
-                <p className="text-sm text-slate-400">Loading products...</p>
+                <p className="text-sm text-neutral-300">Loading products...</p>
               </div>
             ) : products.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-slate-700 px-4 py-12 text-center">
+              <div className="rounded-xl border border-dashed border-neutral-800 px-4 py-12 text-center">
                 <p className="font-medium text-slate-300">
                   {debouncedSearch
                     ? "No matching products found."
@@ -1242,14 +1242,14 @@ function StatCard({
   detail: string;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-      <p className="text-sm text-slate-400">{label}</p>
+    <div className="rounded-2xl border border-neutral-700 bg-neutral-900 p-5">
+      <p className="text-sm text-neutral-500">{label}</p>
 
       <p className="mt-3 break-words text-2xl font-bold tracking-tight sm:text-3xl">
         {value}
       </p>
 
-      <p className="mt-2 text-xs text-slate-500">{detail}</p>
+      <p className="mt-2 text-xs text-neutral-500">{detail}</p>
     </div>
   );
 }
